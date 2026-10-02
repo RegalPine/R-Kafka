@@ -19,9 +19,9 @@ R-Kafka 是纯 Rust 实现的 Kafka 兼容分布式消息流引擎。本文档�
 
 ### 1.1 前置条件
 
-- Rust 1.70+ (推荐最新 stable)
+- Rust 1.75+ (见 `rust-toolchain.toml`，workspace `rust-version = "1.75"`)
 - Linux / macOS / WSL2
-- 磁盘空间: 根据数据量 (默认数据目录 `/var/lib/r-kafka/data`)
+- 磁盘空间: 根据数据量 (默认数据目录 `/data/r-kafka`)
 
 ### 1.2 编译
 
@@ -295,16 +295,16 @@ kafka-console-producer.sh --bootstrap-server broker1:9093 \
 
 | 配置项 | 推荐值 | 说明 |
 |--------|--------|------|
-| `replication.factor` | 3 | 3 副本保证高可用 |
-| `min.isr` | 2 | 至少 2 个 ISR 确认 |
-| `unclean.leader.election` | false | 禁止非 ISR 选举 |
-| `flush.mode` | hybrid | 混合刷盘 (性能 + 持久) |
-| `segment.max.size` | 1GB | 标准 segment 大小 |
-| `retention.ms` | 7 days | 默认保留 7 天 |
-| `cleanup.policy` | compact,delete | 压缩 + 过期删除 |
-| `tls.enabled` | true | 生产必须加密 |
-| `sasl.enabled` | true | 生产必须认证 |
-| `acl.enabled` | true | 生产必须授权 |
+| `[replication] default_replication_factor` | 3 | 3 副本保证高可用 |
+| `[replication] min_isr_size` | 2 | 至少 2 个 ISR 确认 |
+| `[replication] unclean_leader_election` | false | 禁止非 ISR 选举 |
+| `[storage] flush_mode` | hybrid | 混合刷盘 (性能 + 持久) |
+| `[storage] segment_max_size` | 1GB | 标准 segment 大小 |
+| `[retention] max_ms` | 604800000 | 默认保留 7 天 |
+| `[retention] compaction_enabled` | true | 启用 Log Compaction |
+| `[security] tls_enabled` | true | 生产必须加密 |
+| `[security] sasl_enabled` | true | 生产必须认证 |
+| `[security] acl_enabled` | true | 生产必须授权 |
 
 ---
 
