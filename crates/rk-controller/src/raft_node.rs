@@ -93,9 +93,7 @@ pub enum LogEntry {
         configs: Vec<(String, String)>,
     },
     /// 删除 Topic
-    DeleteTopic {
-        topic_name: String,
-    },
+    DeleteTopic { topic_name: String },
     /// 更新 Partition 分配
     AssignPartition {
         topic_name: String,
@@ -118,9 +116,7 @@ pub enum LogEntry {
         port: u16,
     },
     /// Broker 注销
-    UnregisterBroker {
-        broker_id: i32,
-    },
+    UnregisterBroker { broker_id: i32 },
     /// 配置变更
     SetConfig {
         resource_type: String,
@@ -129,10 +125,7 @@ pub enum LogEntry {
         value: String,
     },
     /// Feature 版本更新
-    UpdateFeature {
-        name: String,
-        version: u16,
-    },
+    UpdateFeature { name: String, version: u16 },
     /// 空条目 (用于 No-op 提交)
     Noop,
 }
@@ -325,7 +318,10 @@ mod tests {
 
     #[test]
     fn test_node_role_display() {
-        assert_eq!(format!("{}", NodeRole::ControllerBroker), "controller+broker");
+        assert_eq!(
+            format!("{}", NodeRole::ControllerBroker),
+            "controller+broker"
+        );
         assert_eq!(format!("{}", NodeRole::Controller), "controller");
         assert_eq!(format!("{}", NodeRole::Broker), "broker");
     }

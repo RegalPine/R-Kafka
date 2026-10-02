@@ -3,10 +3,10 @@
 //! 增量修改 Broker 或 Topic 运行时配置。
 //! KIP-248, v0+ 全部为 Flexible 格式。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── 配置操作类型 ────────────────────────────────────────────────────
 
@@ -84,7 +84,10 @@ impl KafkaRequestDecoder for IncrementalAlterConfigsRequest {
         })?;
         let validate_only = reader.read_bool()?;
         let _tags = reader.read_tagged_fields();
-        Ok(Self { resources, validate_only })
+        Ok(Self {
+            resources,
+            validate_only,
+        })
     }
 }
 
@@ -144,10 +147,22 @@ mod tests {
 
     #[test]
     fn test_incremental_alter_configs_op_from_i8() {
-        assert_eq!(IncrementalAlterConfigsOp::from_i8(0), Some(IncrementalAlterConfigsOp::Set));
-        assert_eq!(IncrementalAlterConfigsOp::from_i8(1), Some(IncrementalAlterConfigsOp::Delete));
-        assert_eq!(IncrementalAlterConfigsOp::from_i8(2), Some(IncrementalAlterConfigsOp::Append));
-        assert_eq!(IncrementalAlterConfigsOp::from_i8(3), Some(IncrementalAlterConfigsOp::Subtract));
+        assert_eq!(
+            IncrementalAlterConfigsOp::from_i8(0),
+            Some(IncrementalAlterConfigsOp::Set)
+        );
+        assert_eq!(
+            IncrementalAlterConfigsOp::from_i8(1),
+            Some(IncrementalAlterConfigsOp::Delete)
+        );
+        assert_eq!(
+            IncrementalAlterConfigsOp::from_i8(2),
+            Some(IncrementalAlterConfigsOp::Append)
+        );
+        assert_eq!(
+            IncrementalAlterConfigsOp::from_i8(3),
+            Some(IncrementalAlterConfigsOp::Subtract)
+        );
         assert_eq!(IncrementalAlterConfigsOp::from_i8(99), None);
     }
 }

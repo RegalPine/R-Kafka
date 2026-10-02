@@ -19,11 +19,7 @@ impl VoteHandler {
     }
 
     /// 处理 Vote 请求
-    pub fn handle(
-        &self,
-        request: VoteRequest,
-        _version: i16,
-    ) -> Result<VoteResponse> {
+    pub fn handle(&self, request: VoteRequest, _version: i16) -> Result<VoteResponse> {
         debug!(
             candidate_id = request.candidate_id,
             candidate_epoch = request.candidate_epoch,

@@ -2,10 +2,10 @@
 //!
 //! 结束事务: 提交或中止。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -27,14 +27,24 @@ impl KafkaRequestDecoder for EndTxnRequest {
             let producer_epoch = reader.read_i16()?;
             let committed = reader.read_bool()?;
             let _tags = reader.read_tagged_fields()?;
-            Ok(Self { transactional_id, producer_id, producer_epoch, committed })
+            Ok(Self {
+                transactional_id,
+                producer_id,
+                producer_epoch,
+                committed,
+            })
         } else {
             // Legacy v0-v2
             let transactional_id = reader.read_string()?;
             let producer_id = reader.read_i64()?;
             let producer_epoch = reader.read_i16()?;
             let committed = reader.read_bool()?;
-            Ok(Self { transactional_id, producer_id, producer_epoch, committed })
+            Ok(Self {
+                transactional_id,
+                producer_id,
+                producer_epoch,
+                committed,
+            })
         }
     }
 }

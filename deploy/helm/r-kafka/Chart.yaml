@@ -1,0 +1,17 @@
+apiVersion: v2
+name: r-kafka
+description: R-Kafka — Pure Rust Kafka-compatible distributed messaging engine
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - kafka
+  - streaming
+  - messaging
+  - distributed-systems
+  - rust
+home: https://github.com/RegalPine/R-Kafka
+sources:
+  - https://github.com/RegalPine/R-Kafka
+maintainers:
+  - name: RegalPine

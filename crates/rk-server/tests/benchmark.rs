@@ -42,7 +42,11 @@ fn bench_crc32c_throughput() {
     println!("Iterations: {}", iterations);
     println!("Total bytes: {} MB", total_bytes / 1_048_576);
     println!("Elapsed: {:?}", elapsed);
-    println!("Throughput: {:.2} MB/s ({:.2} GB/s)", throughput_mb_s, throughput_mb_s / 1024.0);
+    println!(
+        "Throughput: {:.2} MB/s ({:.2} GB/s)",
+        throughput_mb_s,
+        throughput_mb_s / 1024.0
+    );
 
     // 验证: 硬件加速应达到 10 GB/s+
     // 软件实现约 1-2 GB/s
@@ -53,7 +57,11 @@ fn bench_crc32c_throughput() {
     }
 
     // 断言: 至少达到 1 GB/s (即使是软件实现)
-    assert!(throughput_mb_s > 1024.0, "CRC32C throughput too low: {:.2} MB/s", throughput_mb_s);
+    assert!(
+        throughput_mb_s > 1024.0,
+        "CRC32C throughput too low: {:.2} MB/s",
+        throughput_mb_s
+    );
 }
 
 /// 单 Partition 连续写入基准测试
@@ -68,7 +76,8 @@ fn bench_single_partition_write() {
         TopicName("bench-single".to_string()),
         PartitionId(0),
         1_073_741_824,
-    ).unwrap();
+    )
+    .unwrap();
 
     // 100K 条消息
     let message_count: i64 = 100_000;
@@ -80,16 +89,16 @@ fn bench_single_partition_write() {
 
     for i in 0..message_count {
         let batch = build_batch_bytes(
-            i,                          // base_offset
-            1,                          // partition_leader_epoch
-            0,                          // attributes
-            current_timestamp_ms(),     // base_timestamp
-            current_timestamp_ms(),     // max_timestamp
-            -1,                         // producer_id
-            -1,                         // producer_epoch
-            -1,                         // base_sequence
-            &records,                   // records_bytes
-            1,                          // record_count
+            i,                      // base_offset
+            1,                      // partition_leader_epoch
+            0,                      // attributes
+            current_timestamp_ms(), // base_timestamp
+            current_timestamp_ms(), // max_timestamp
+            -1,                     // producer_id
+            -1,                     // producer_epoch
+            -1,                     // base_sequence
+            &records,               // records_bytes
+            1,                      // record_count
         );
         log.append_batch(&batch).unwrap();
     }
@@ -108,7 +117,11 @@ fn bench_single_partition_write() {
     println!("Ops/sec: {:.0}", ops_per_sec);
 
     // 断言: 至少达到 100 MB/s (保守估计)
-    assert!(throughput_mb_s > 100.0, "Write throughput too low: {:.2} MB/s", throughput_mb_s);
+    assert!(
+        throughput_mb_s > 100.0,
+        "Write throughput too low: {:.2} MB/s",
+        throughput_mb_s
+    );
 }
 
 /// 攒批写入 vs 逐条写入对比基准测试
@@ -128,21 +141,29 @@ fn bench_batch_write_comparison() {
         TopicName("bench-no-batch".to_string()),
         PartitionId(0),
         1_073_741_824,
-    ).unwrap();
+    )
+    .unwrap();
     let start1 = Instant::now();
 
     for i in 0..message_count {
         let batch = build_batch_bytes(
-            i, 1, 0,
-            current_timestamp_ms(), current_timestamp_ms(),
-            -1, -1, -1,
-            &records, 1,
+            i,
+            1,
+            0,
+            current_timestamp_ms(),
+            current_timestamp_ms(),
+            -1,
+            -1,
+            -1,
+            &records,
+            1,
         );
         log1.append_batch(&batch).unwrap();
     }
 
     let elapsed1 = start1.elapsed();
-    let throughput1 = (message_count * (record_size + 61)) as f64 / 1_048_576.0 / elapsed1.as_secs_f64();
+    let throughput1 =
+        (message_count * (record_size + 61)) as f64 / 1_048_576.0 / elapsed1.as_secs_f64();
 
     // === 测试 2: 攒批写入 (每 100 条合并为 1 个 batch) ===
     let mut log2 = CommitLog::create(
@@ -150,7 +171,8 @@ fn bench_batch_write_comparison() {
         TopicName("bench-with-batch".to_string()),
         PartitionId(0),
         1_073_741_824,
-    ).unwrap();
+    )
+    .unwrap();
     let batch_size: i64 = 100;
     let start2 = Instant::now();
 
@@ -162,17 +184,24 @@ fn bench_batch_write_comparison() {
             .collect();
 
         let batch = build_batch_bytes(
-            offset, 1, 0,
-            current_timestamp_ms(), current_timestamp_ms(),
-            -1, -1, -1,
-            &merged_records, batch_size as i32,
+            offset,
+            1,
+            0,
+            current_timestamp_ms(),
+            current_timestamp_ms(),
+            -1,
+            -1,
+            -1,
+            &merged_records,
+            batch_size as i32,
         );
         log2.append_batch(&batch).unwrap();
         offset += batch_size;
     }
 
     let elapsed2 = start2.elapsed();
-    let throughput2 = (message_count * (record_size + 61)) as f64 / 1_048_576.0 / elapsed2.as_secs_f64();
+    let throughput2 =
+        (message_count * (record_size + 61)) as f64 / 1_048_576.0 / elapsed2.as_secs_f64();
 
     println!("\n=== Batch Write Comparison Benchmark ===");
     println!("Messages: {}", message_count);
@@ -209,7 +238,8 @@ fn bench_fetch_sequential() {
         TopicName("bench-fetch".to_string()),
         PartitionId(0),
         1_073_741_824,
-    ).unwrap();
+    )
+    .unwrap();
 
     // 先写入 10K 条消息 (减少数量以加快测试速度)
     let message_count: i64 = 10_000;
@@ -218,10 +248,16 @@ fn bench_fetch_sequential() {
 
     for i in 0..message_count {
         let batch = build_batch_bytes(
-            i, 1, 0,
-            current_timestamp_ms(), current_timestamp_ms(),
-            -1, -1, -1,
-            &records, 1,
+            i,
+            1,
+            0,
+            current_timestamp_ms(),
+            current_timestamp_ms(),
+            -1,
+            -1,
+            -1,
+            &records,
+            1,
         );
         log.append_batch(&batch).unwrap();
     }
@@ -252,10 +288,17 @@ fn bench_fetch_sequential() {
     println!("Ops/sec: {:.0}", ops_per_sec);
 
     // 断言: 至少读取了全部消息
-    assert_eq!(read_count, message_count as usize, "Should read all messages");
+    assert_eq!(
+        read_count, message_count as usize,
+        "Should read all messages"
+    );
 
     // 断言: 吞吐至少 100 MB/s
-    assert!(throughput_mb_s > 100.0, "Fetch throughput too low: {:.2} MB/s", throughput_mb_s);
+    assert!(
+        throughput_mb_s > 100.0,
+        "Fetch throughput too low: {:.2} MB/s",
+        throughput_mb_s
+    );
 }
 
 /// 辅助函数: 获取当前时间戳 (毫秒)

@@ -22,8 +22,8 @@
 //! records                (...)   variable
 //! ```
 
-use rk_core::error::Result;
 use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 /// RecordBatch magic 值 (v2)
 pub const RECORDBATCH_MAGIC: i8 = 2;
@@ -209,8 +209,14 @@ mod tests {
     fn test_attributes_parsing() {
         // compression=snappy(2), timestamp_type=LogAppendTime(1), isTransactional=true
         let attrs: i16 = 2 | 0x08 | 0x10;
-        assert_eq!(CompressionType::from_attributes(attrs), CompressionType::Snappy);
-        assert_eq!(TimestampType::from_attributes(attrs), TimestampType::LogAppendTime);
+        assert_eq!(
+            CompressionType::from_attributes(attrs),
+            CompressionType::Snappy
+        );
+        assert_eq!(
+            TimestampType::from_attributes(attrs),
+            TimestampType::LogAppendTime
+        );
         assert!(attrs & 0x10 != 0); // transactional
         assert!(attrs & 0x20 == 0); // not control batch
     }

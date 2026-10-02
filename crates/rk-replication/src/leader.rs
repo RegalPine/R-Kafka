@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use rk_core::types::{BrokerId, Offset, PartitionId, TopicName};
 use tracing::{debug, info};
 
@@ -222,7 +222,11 @@ impl LeaderReplica {
         // 尝试推进 HW
         self.try_advance_hw();
 
-        let lag = self.followers.get(&follower_id).unwrap().lag(self.leader_leo);
+        let lag = self
+            .followers
+            .get(&follower_id)
+            .unwrap()
+            .lag(self.leader_leo);
         Ok((self.leader_hw, lag))
     }
 
@@ -292,11 +296,15 @@ impl LeaderReplica {
 
     /// 添加新的 Follower (扩容)
     pub fn add_follower(&mut self, broker_id: BrokerId) {
-        if !self.followers.contains_key(&broker_id) {
-            self.followers.insert(broker_id, FollowerProgress::new(broker_id));
-            if !self.replica_assignment.contains(&broker_id) {
-                self.replica_assignment.push(broker_id);
+        use std::collections::hash_map::Entry;
+        match self.followers.entry(broker_id) {
+            Entry::Vacant(entry) => {
+                entry.insert(FollowerProgress::new(broker_id));
+                if !self.replica_assignment.contains(&broker_id) {
+                    self.replica_assignment.push(broker_id);
+                }
             }
+            Entry::Occupied(_) => {}
         }
     }
 
@@ -328,7 +336,11 @@ impl LeaderReplica {
 
     /// 获取 LeaderReplica 摘要
     pub fn summary(&self) -> LeaderReplicaSummary {
-        let total_lag: i64 = self.followers.values().map(|p| p.lag(self.leader_leo)).sum();
+        let total_lag: i64 = self
+            .followers
+            .values()
+            .map(|p| p.lag(self.leader_leo))
+            .sum();
         let total_bytes: i64 = self.followers.values().map(|p| p.bytes_replicated).sum();
         let total_fetches: u64 = self.followers.values().map(|p| p.fetch_count).sum();
 
@@ -469,14 +481,21 @@ mod tests {
         leader.update_leader_leo(Offset(100));
 
         // Follower 2 fetch: 从 0 开始，获取 80 字节 (简化为 offset 0-79)
-        let (hw, lag) = leader.handle_follower_fetch(broker(2), Offset(0), 80).unwrap();
-        assert_eq!(leader.follower_progress(broker(2)).unwrap().log_end_offset, Offset(80));
+        let (hw, lag) = leader
+            .handle_follower_fetch(broker(2), Offset(0), 80)
+            .unwrap();
+        assert_eq!(
+            leader.follower_progress(broker(2)).unwrap().log_end_offset,
+            Offset(80)
+        );
         // HW = min(leader=100, f2=80, f3=0) = 0
         assert_eq!(hw, Offset(0));
         assert_eq!(lag, 20); // 100 - 80
 
         // Follower 3 fetch: 从 0 开始，获取 90 字节
-        let (hw, lag) = leader.handle_follower_fetch(broker(3), Offset(0), 90).unwrap();
+        let (hw, lag) = leader
+            .handle_follower_fetch(broker(3), Offset(0), 90)
+            .unwrap();
         // HW = min(100, 80, 90) = 80
         assert_eq!(hw, Offset(80));
         assert_eq!(lag, 10);
@@ -493,11 +512,15 @@ mod tests {
         );
 
         leader.update_leader_leo(Offset(100));
-        leader.handle_follower_fetch(broker(2), Offset(0), 80).unwrap();
+        leader
+            .handle_follower_fetch(broker(2), Offset(0), 80)
+            .unwrap();
         assert_eq!(leader.leader_hw(), Offset(80));
 
         // Follower 回退 (模拟重传)，HW 不应回退
-        leader.handle_follower_fetch(broker(2), Offset(0), 50).unwrap();
+        leader
+            .handle_follower_fetch(broker(2), Offset(0), 50)
+            .unwrap();
         assert_eq!(leader.leader_hw(), Offset(80)); // 保持 80
     }
 
@@ -554,8 +577,12 @@ mod tests {
         );
 
         leader.update_leader_leo(Offset(100));
-        leader.handle_follower_fetch(broker(2), Offset(0), 80).unwrap();
-        leader.handle_follower_fetch(broker(3), Offset(0), 60).unwrap();
+        leader
+            .handle_follower_fetch(broker(2), Offset(0), 80)
+            .unwrap();
+        leader
+            .handle_follower_fetch(broker(3), Offset(0), 60)
+            .unwrap();
 
         assert_eq!(leader.max_follower_lag(), 40); // broker(3) lag = 100 - 60
     }
@@ -570,7 +597,9 @@ mod tests {
             vec![broker(1), broker(2)],
         );
 
-        assert!(leader.handle_follower_fetch(broker(99), Offset(0), 10).is_err());
+        assert!(leader
+            .handle_follower_fetch(broker(99), Offset(0), 10)
+            .is_err());
     }
 
     #[test]
@@ -584,8 +613,12 @@ mod tests {
         );
 
         leader.update_leader_leo(Offset(100));
-        leader.handle_follower_fetch(broker(2), Offset(0), 80).unwrap();
-        leader.handle_follower_fetch(broker(3), Offset(0), 60).unwrap();
+        leader
+            .handle_follower_fetch(broker(2), Offset(0), 80)
+            .unwrap();
+        leader
+            .handle_follower_fetch(broker(3), Offset(0), 60)
+            .unwrap();
 
         let summary = leader.summary();
         assert_eq!(summary.topic, topic("test"));
@@ -614,7 +647,13 @@ mod tests {
         let leader = LeaderReplica::from_replica_set(&prs);
         assert_eq!(leader.leader_leo(), Offset(100));
         assert_eq!(leader.leader_hw(), Offset(80));
-        assert_eq!(leader.follower_progress(broker(2)).unwrap().log_end_offset, Offset(90));
-        assert_eq!(leader.follower_progress(broker(3)).unwrap().log_end_offset, Offset(80));
+        assert_eq!(
+            leader.follower_progress(broker(2)).unwrap().log_end_offset,
+            Offset(90)
+        );
+        assert_eq!(
+            leader.follower_progress(broker(3)).unwrap().log_end_offset,
+            Offset(80)
+        );
     }
 }

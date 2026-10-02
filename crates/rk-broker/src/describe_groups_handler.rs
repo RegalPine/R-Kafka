@@ -27,10 +27,7 @@ impl DescribeGroupsHandler {
         request: DescribeGroupsRequest,
         _version: i16,
     ) -> Result<DescribeGroupsResponse> {
-        debug!(
-            groups = request.groups.len(),
-            "DescribeGroups request"
-        );
+        debug!(groups = request.groups.len(), "DescribeGroups request");
 
         let mut response_groups = Vec::with_capacity(request.groups.len());
 
@@ -98,7 +95,8 @@ mod tests {
         let gm = Arc::new(GroupManager::new());
 
         // 创建一个组
-        gm.join_group("test-group", "", None, "consumer", vec![1, 2, 3]).unwrap();
+        gm.join_group("test-group", "", None, "consumer", vec![1, 2, 3])
+            .unwrap();
 
         let handler = DescribeGroupsHandler::new(gm);
 
@@ -127,15 +125,20 @@ mod tests {
 
         let response = handler.handle(request, 0).unwrap();
         assert_eq!(response.groups.len(), 1);
-        assert_eq!(response.groups[0].error_code, KafkaErrorCode::GroupIdNotFound);
+        assert_eq!(
+            response.groups[0].error_code,
+            KafkaErrorCode::GroupIdNotFound
+        );
     }
 
     #[test]
     fn test_describe_groups_handler_multiple() {
         let gm = Arc::new(GroupManager::new());
 
-        gm.join_group("group-1", "", None, "consumer", vec![]).unwrap();
-        gm.join_group("group-2", "", None, "consumer", vec![]).unwrap();
+        gm.join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
+        gm.join_group("group-2", "", None, "consumer", vec![])
+            .unwrap();
 
         let handler = DescribeGroupsHandler::new(gm);
 

@@ -4,13 +4,14 @@
 //! - Producer ID + Epoch 分配
 //! - 序列号验证 (检测重复/乱序)
 //! - 事务状态跟踪
+//!
 //! Phase 1: 内存状态，Phase 3 持久化到 __producer_id 内部 topic。
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use dashmap::DashMap;
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use tracing::{debug, warn};
 
 /// 生产者状态
@@ -61,6 +62,12 @@ pub struct ProducerStateManager {
     txn_to_producer: DashMap<String, i64>,
     /// 下一个 producer_id
     next_producer_id: AtomicI64,
+}
+
+impl Default for ProducerStateManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ProducerStateManager {
@@ -120,10 +127,10 @@ impl ProducerStateManager {
         partition: i32,
         base_sequence: i32,
     ) -> Result<bool> {
-        let mut entry = self.producers.get_mut(&producer_id)
-            .ok_or_else(|| RkError::Protocol(
-                format!("Unknown producer_id: {}", producer_id)
-            ))?;
+        let mut entry = self
+            .producers
+            .get_mut(&producer_id)
+            .ok_or_else(|| RkError::Protocol(format!("Unknown producer_id: {}", producer_id)))?;
 
         // 验证 epoch
         if entry.producer_epoch != producer_epoch {
@@ -168,10 +175,10 @@ impl ProducerStateManager {
 
     /// 开始事务
     pub fn begin_transaction(&self, producer_id: i64) -> Result<()> {
-        let mut entry = self.producers.get_mut(&producer_id)
-            .ok_or_else(|| RkError::Protocol(
-                format!("Unknown producer_id: {}", producer_id)
-            ))?;
+        let mut entry = self
+            .producers
+            .get_mut(&producer_id)
+            .ok_or_else(|| RkError::Protocol(format!("Unknown producer_id: {}", producer_id)))?;
 
         match entry.txn_state {
             TransactionState::None | TransactionState::Complete => {
@@ -192,10 +199,10 @@ impl ProducerStateManager {
 
     /// 提交事务
     pub fn commit_transaction(&self, producer_id: i64) -> Result<()> {
-        let mut entry = self.producers.get_mut(&producer_id)
-            .ok_or_else(|| RkError::Protocol(
-                format!("Unknown producer_id: {}", producer_id)
-            ))?;
+        let mut entry = self
+            .producers
+            .get_mut(&producer_id)
+            .ok_or_else(|| RkError::Protocol(format!("Unknown producer_id: {}", producer_id)))?;
 
         match entry.txn_state {
             TransactionState::Ongoing => {
@@ -214,10 +221,10 @@ impl ProducerStateManager {
 
     /// 中止事务
     pub fn abort_transaction(&self, producer_id: i64) -> Result<()> {
-        let mut entry = self.producers.get_mut(&producer_id)
-            .ok_or_else(|| RkError::Protocol(
-                format!("Unknown producer_id: {}", producer_id)
-            ))?;
+        let mut entry = self
+            .producers
+            .get_mut(&producer_id)
+            .ok_or_else(|| RkError::Protocol(format!("Unknown producer_id: {}", producer_id)))?;
 
         match entry.txn_state {
             TransactionState::Ongoing => {
@@ -245,19 +252,20 @@ impl ProducerStateManager {
 
     /// 获取事务状态
     pub fn get_transaction_state(&self, producer_id: i64) -> Option<TransactionState> {
-        self.producers.get(&producer_id).map(|v| v.txn_state.clone())
+        self.producers
+            .get(&producer_id)
+            .map(|v| v.txn_state.clone())
     }
 
     /// 获取指定 partition 上的活跃生产者列表
-    pub fn get_producers_for_partition(
-        &self,
-        topic: &str,
-        partition: i32,
-    ) -> Vec<ProducerState> {
+    pub fn get_producers_for_partition(&self, topic: &str, partition: i32) -> Vec<ProducerState> {
         let mut result = Vec::new();
         for entry in self.producers.iter() {
             let state = entry.value();
-            if state.last_sequence.contains_key(&(topic.to_string(), partition)) {
+            if state
+                .last_sequence
+                .contains_key(&(topic.to_string(), partition))
+            {
                 result.push(state.clone());
             }
         }

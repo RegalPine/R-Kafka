@@ -27,8 +27,8 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use rk_broker::{PartitionManager, BrokerRouter, OffsetManager};
-use rk_protocol::types::{KafkaWriter, KafkaReader};
+use rk_broker::{BrokerRouter, OffsetManager, PartitionManager};
+use rk_protocol::types::{KafkaReader, KafkaWriter};
 use rk_storage::log_io::build_batch_bytes;
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────
@@ -47,7 +47,13 @@ fn build_legacy_frame(body_builder: impl FnOnce(&mut KafkaWriter<'_>)) -> Vec<u8
 }
 
 /// 写入 Legacy RequestHeader
-fn write_legacy_header(w: &mut KafkaWriter<'_>, api_key: i16, api_version: i16, correlation_id: i32, client_id: &str) {
+fn write_legacy_header(
+    w: &mut KafkaWriter<'_>,
+    api_key: i16,
+    api_version: i16,
+    correlation_id: i32,
+    client_id: &str,
+) {
     w.write_i16(api_key);
     w.write_i16(api_version);
     w.write_i32(correlation_id);
@@ -67,13 +73,28 @@ async fn read_response_frame(stream: &mut TcpStream) -> Vec<u8> {
 /// 构建测试 RecordBatch
 fn make_test_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
     let records = vec![0u8; record_count as usize * 10];
-    build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+    build_batch_bytes(
+        base_offset,
+        1,
+        0,
+        1000,
+        2000,
+        -1,
+        -1,
+        -1,
+        &records,
+        record_count,
+    )
 }
 
 /// 启动测试服务器
 async fn setup_server() -> u16 {
     let dir = tempfile::tempdir().unwrap();
-    let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+    let pm = Arc::new(PartitionManager::new(
+        dir.path().to_path_buf(),
+        1_073_741_824,
+        1,
+    ));
     let offset_manager = Arc::new(OffsetManager::new(None));
 
     let router = Arc::new(BrokerRouter::with_offset_manager(
@@ -139,7 +160,9 @@ async fn create_topic(stream: &mut TcpStream, topic: &str, partitions: i32, corr
 #[tokio::test]
 async fn test_metadata_exchange() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .unwrap();
 
     // Step 1: Metadata v0 — 获取全部 broker 信息
     let frame = build_legacy_frame(|w| {
@@ -193,7 +216,7 @@ async fn test_metadata_exchange() {
 
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 3, 2, 4, "rk-broker-1"); // v2 for cluster_id
-        // v1+: nullable array of topics
+                                                        // v1+: nullable array of topics
         w.write_i32(1); // 1 topic
         w.write_string("interop-topic");
     });
@@ -218,7 +241,10 @@ async fn test_metadata_exchange() {
 
     // Topic metadata
     let topic_count = reader.read_i32().unwrap();
-    assert!(topic_count >= 1, "Should have at least 1 topic after creation");
+    assert!(
+        topic_count >= 1,
+        "Should have at least 1 topic after creation"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -235,7 +261,9 @@ async fn test_metadata_exchange() {
 #[tokio::test]
 async fn test_leader_and_isr_handling() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .unwrap();
 
     // 先创建 topic
     create_topic(&mut stream, "leader-test", 3, 1).await;
@@ -244,20 +272,24 @@ async fn test_leader_and_isr_handling() {
     // LeaderAndIsr API Key = 4
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 4, 0, 2, "controller-1");
-        w.write_i32(1);   // controller_id
-        w.write_i32(5);   // controller_epoch
-        w.write_i32(1);   // 1 partition state
-        // Partition state for "leader-test" partition 0
+        w.write_i32(1); // controller_id
+        w.write_i32(5); // controller_epoch
+        w.write_i32(1); // 1 partition state
+                        // Partition state for "leader-test" partition 0
         w.write_compact_string("leader-test");
-        w.write_i32(0);   // partition_index
-        w.write_i32(5);   // controller_epoch
-        w.write_i32(1);   // leader (broker 1)
-        w.write_i32(1);   // leader_epoch
+        w.write_i32(0); // partition_index
+        w.write_i32(5); // controller_epoch
+        w.write_i32(1); // leader (broker 1)
+        w.write_i32(1); // leader_epoch
         w.write_compact_array(&[1i32], |w2, &v| w2.write_i32(v)); // isr
-        w.write_i32(1);   // partition_epoch
+        w.write_i32(1); // partition_epoch
         w.write_compact_array(&[1i32], |w2, &v| w2.write_i32(v)); // replicas
-        w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| w2.write_i32(v)); // adding
-        w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| w2.write_i32(v)); // removing
+        w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| {
+            w2.write_i32(v)
+        }); // adding
+        w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| {
+            w2.write_i32(v)
+        }); // removing
         w.write_tagged_fields(&[]);
         w.write_tagged_fields(&[]);
     });
@@ -277,9 +309,9 @@ async fn test_leader_and_isr_handling() {
     // Step 2: 发送多 partition LeaderAndIsr
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 4, 0, 3, "controller-1");
-        w.write_i32(1);   // controller_id
-        w.write_i32(5);   // controller_epoch
-        w.write_i32(3);   // 3 partition states
+        w.write_i32(1); // controller_id
+        w.write_i32(5); // controller_epoch
+        w.write_i32(3); // 3 partition states
         for p in 0..3 {
             w.write_compact_string("leader-test");
             w.write_i32(p); // partition_index
@@ -289,8 +321,12 @@ async fn test_leader_and_isr_handling() {
             w.write_compact_array(&[1i32, 2, 3], |w2, &v| w2.write_i32(v)); // isr
             w.write_i32(2); // partition_epoch
             w.write_compact_array(&[1i32, 2, 3], |w2, &v| w2.write_i32(v)); // replicas
-            w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| w2.write_i32(v));
-            w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| w2.write_i32(v));
+            w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| {
+                w2.write_i32(v)
+            });
+            w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| {
+                w2.write_i32(v)
+            });
             w.write_tagged_fields(&[]);
         }
         w.write_tagged_fields(&[]);
@@ -306,12 +342,12 @@ async fn test_leader_and_isr_handling() {
     // Step 3: 发送 StopReplica v0 (API Key = 5)
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 5, 0, 4, "controller-1");
-        w.write_i32(1);    // controller_id
-        w.write_i32(5);    // controller_epoch
+        w.write_i32(1); // controller_id
+        w.write_i32(5); // controller_epoch
         w.write_bool(false); // delete_partitions = false (just stop, don't delete)
-        w.write_i32(1);    // 1 partition
+        w.write_i32(1); // 1 partition
         w.write_compact_string("leader-test");
-        w.write_i32(0);    // partition_index
+        w.write_i32(0); // partition_index
         w.write_tagged_fields(&[]);
         w.write_tagged_fields(&[]);
     });
@@ -339,7 +375,9 @@ async fn test_leader_and_isr_handling() {
 #[tokio::test]
 async fn test_replica_fetch_compatibility() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .unwrap();
 
     // 创建 topic 并 Produce 数据
     create_topic(&mut stream, "replica-test", 3, 1).await;
@@ -348,12 +386,12 @@ async fn test_replica_fetch_compatibility() {
     let batch = make_test_batch(0, 5);
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 0, 0, 2, "rk-follower-2");
-        w.write_i16(1);   // acks = 1 (需要响应)
+        w.write_i16(1); // acks = 1 (需要响应)
         w.write_i32(3000); // timeout_ms
-        w.write_i32(1);   // 1 topic
+        w.write_i32(1); // 1 topic
         w.write_string("replica-test");
-        w.write_i32(1);   // 1 partition
-        w.write_i32(0);   // partition 0
+        w.write_i32(1); // 1 partition
+        w.write_i32(0); // partition 0
         w.write_bytes(&batch);
     });
     stream.write_all(&frame).await.unwrap();
@@ -362,14 +400,14 @@ async fn test_replica_fetch_compatibility() {
     // Step 1: Fetch v0 with replica_id = 2 (simulating Follower)
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 1, 0, 3, "rk-follower-2");
-        w.write_i32(2);     // replica_id = 2 (Follower)
-        w.write_i32(100);   // max_wait_ms
-        w.write_i32(1024);  // min_bytes
-        w.write_i32(1);     // 1 topic
+        w.write_i32(2); // replica_id = 2 (Follower)
+        w.write_i32(100); // max_wait_ms
+        w.write_i32(1024); // min_bytes
+        w.write_i32(1); // 1 topic
         w.write_string("replica-test");
-        w.write_i32(1);     // 1 partition
-        w.write_i32(0);     // partition 0
-        w.write_i64(0);     // fetch_offset
+        w.write_i32(1); // 1 partition
+        w.write_i32(0); // partition 0
+        w.write_i64(0); // fetch_offset
         w.write_i32(65536); // max_bytes
     });
     stream.write_all(&frame).await.unwrap();
@@ -381,7 +419,10 @@ async fn test_replica_fetch_compatibility() {
     // Fetch v0 response body: throttle_time_ms
     let _throttle = reader.read_i32().unwrap();
     let topic_count = reader.read_i32().unwrap();
-    assert!(topic_count >= 1, "Should have at least 1 topic in fetch response");
+    assert!(
+        topic_count >= 1,
+        "Should have at least 1 topic in fetch response"
+    );
     let _topic_name = reader.read_string();
     let partition_count = reader.read_i32().unwrap();
     assert!(partition_count >= 1);
@@ -397,19 +438,19 @@ async fn test_replica_fetch_compatibility() {
     // Step 2: Fetch v4 with isolation_level (READ_COMMITTED)
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 1, 4, 4, "rk-follower-2");
-        w.write_i32(2);     // replica_id = 2 (Follower)
-        w.write_i32(100);   // max_wait_ms
-        w.write_i32(1);     // min_bytes
+        w.write_i32(2); // replica_id = 2 (Follower)
+        w.write_i32(100); // max_wait_ms
+        w.write_i32(1); // min_bytes
         w.write_i32(65536); // max_bytes (v3+)
-        w.write_i8(1);      // isolation_level = READ_COMMITTED (v4+)
-        // NO session_id/epoch (v7+)
-        w.write_i32(1);     // 1 topic
+        w.write_i8(1); // isolation_level = READ_COMMITTED (v4+)
+                       // NO session_id/epoch (v7+)
+        w.write_i32(1); // 1 topic
         w.write_string("replica-test");
-        w.write_i32(1);     // 1 partition
-        w.write_i32(0);     // partition_index
-        // NO current_leader_epoch (v9+)
-        w.write_i64(0);     // fetch_offset
-        // NO log_start_offset (v5+)
+        w.write_i32(1); // 1 partition
+        w.write_i32(0); // partition_index
+                        // NO current_leader_epoch (v9+)
+        w.write_i64(0); // fetch_offset
+                        // NO log_start_offset (v5+)
         w.write_i32(65536); // max_bytes
     });
     stream.write_all(&frame).await.unwrap();
@@ -439,15 +480,15 @@ async fn test_replica_fetch_compatibility() {
     // Step 3: Fetch with max_bytes = 1 (验证限制)
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 1, 0, 5, "rk-follower-2");
-        w.write_i32(2);     // replica_id
-        w.write_i32(100);   // max_wait_ms
-        w.write_i32(1);     // min_bytes
-        w.write_i32(1);     // 1 topic
+        w.write_i32(2); // replica_id
+        w.write_i32(100); // max_wait_ms
+        w.write_i32(1); // min_bytes
+        w.write_i32(1); // 1 topic
         w.write_string("replica-test");
-        w.write_i32(1);     // 1 partition
-        w.write_i32(0);     // partition 0
-        w.write_i64(0);     // fetch_offset
-        w.write_i32(1);     // max_bytes = 1 (very small)
+        w.write_i32(1); // 1 partition
+        w.write_i32(0); // partition 0
+        w.write_i64(0); // fetch_offset
+        w.write_i32(1); // max_bytes = 1 (very small)
     });
     stream.write_all(&frame).await.unwrap();
     let resp = read_response_frame(&mut stream).await;
@@ -476,7 +517,9 @@ async fn test_rolling_migration_simulation() {
     let port = setup_server().await;
 
     // === Phase 1: Broker 1 启动并注册 ===
-    let mut stream1 = TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap();
+    let mut stream1 = TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .unwrap();
 
     // BrokerRegistration v0 (API Key = 54, flexible format)
     let frame = build_broker_registration_frame(1, "test-cluster", "10.0.0.1", 9092, 1);
@@ -493,11 +536,11 @@ async fn test_rolling_migration_simulation() {
     // === Phase 2: Broker 1 发送心跳 ===
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 55, 0, 2, "rk-broker-1");
-        w.write_i32(1);      // broker_id
+        w.write_i32(1); // broker_id
         w.write_i64(broker_epoch); // broker_epoch
         w.write_bool(false); // want_fence
         w.write_bool(false); // want_shut_down
-        w.write_i64(0);      // current_metadata_offset
+        w.write_i64(0); // current_metadata_offset
         w.write_tagged_fields(&[]);
     });
     stream1.write_all(&frame).await.unwrap();
@@ -515,11 +558,17 @@ async fn test_rolling_migration_simulation() {
     // === Phase 3: Controller 发送 UpdateMetadata ===
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 6, 0, 3, "controller");
-        w.write_i32(1);   // controller_id
-        w.write_i32(1);   // controller_epoch
-        w.write_i32(2);   // 2 brokers
-        w.write_i32(1); w.write_compact_string("10.0.0.1"); w.write_i32(9092); w.write_tagged_fields(&[]);
-        w.write_i32(2); w.write_compact_string("10.0.0.2"); w.write_i32(9092); w.write_tagged_fields(&[]);
+        w.write_i32(1); // controller_id
+        w.write_i32(1); // controller_epoch
+        w.write_i32(2); // 2 brokers
+        w.write_i32(1);
+        w.write_compact_string("10.0.0.1");
+        w.write_i32(9092);
+        w.write_tagged_fields(&[]);
+        w.write_i32(2);
+        w.write_compact_string("10.0.0.2");
+        w.write_i32(9092);
+        w.write_tagged_fields(&[]);
         w.write_tagged_fields(&[]);
     });
     stream1.write_all(&frame).await.unwrap();
@@ -531,7 +580,9 @@ async fn test_rolling_migration_simulation() {
     assert_eq!(um_error, 0, "UpdateMetadata should succeed");
 
     // === Phase 4: Broker 2 加入 (模拟新节点) ===
-    let mut stream2 = TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap();
+    let mut stream2 = TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .unwrap();
     let frame = build_broker_registration_frame(2, "test-cluster", "10.0.0.2", 9092, 1);
     stream2.write_all(&frame).await.unwrap();
     let resp = read_response_frame(&mut stream2).await;
@@ -545,8 +596,8 @@ async fn test_rolling_migration_simulation() {
     // === Phase 5: Broker 1 优雅关闭 ===
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 7, 0, 4, "rk-broker-1");
-        w.write_i32(1);              // broker_id
-        w.write_i64(broker_epoch);   // broker_epoch
+        w.write_i32(1); // broker_id
+        w.write_i64(broker_epoch); // broker_epoch
         w.write_tagged_fields(&[]);
     });
     stream1.write_all(&frame).await.unwrap();
@@ -562,11 +613,11 @@ async fn test_rolling_migration_simulation() {
     // === Phase 6: Broker 2 继续心跳 (验证集群仍健康) ===
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 55, 0, 5, "rk-broker-2");
-        w.write_i32(2);      // broker_id
-        w.write_i64(1);      // broker_epoch
+        w.write_i32(2); // broker_id
+        w.write_i64(1); // broker_epoch
         w.write_bool(false); // want_fence
         w.write_bool(false); // want_shut_down
-        w.write_i64(100);    // current_metadata_offset
+        w.write_i64(100); // current_metadata_offset
         w.write_tagged_fields(&[]);
     });
     stream2.write_all(&frame).await.unwrap();
@@ -575,7 +626,10 @@ async fn test_rolling_migration_simulation() {
     let _corr = reader.read_i32().unwrap();
     let _throttle = reader.read_i32().unwrap();
     let hb2_error = reader.read_i16().unwrap();
-    assert_eq!(hb2_error, 0, "Broker 2 heartbeat should succeed after Broker 1 shutdown");
+    assert_eq!(
+        hb2_error, 0,
+        "Broker 2 heartbeat should succeed after Broker 1 shutdown"
+    );
 
     // === Phase 7: Metadata 验证 (确认 broker 列表更新) ===
     let frame = build_legacy_frame(|w| {
@@ -587,7 +641,10 @@ async fn test_rolling_migration_simulation() {
     let mut reader = KafkaReader::new(&resp);
     let _corr = reader.read_i32().unwrap();
     let broker_count = reader.read_i32().unwrap();
-    assert!(broker_count >= 1, "Should still have brokers after rolling migration");
+    assert!(
+        broker_count >= 1,
+        "Should still have brokers after rolling migration"
+    );
 }
 
 // ─── 辅助: 构建 BrokerRegistration 帧 ────────────────────────────────
@@ -606,8 +663,8 @@ fn build_broker_registration_frame(
 
     // RequestHeader (legacy format — nullable_string, no tagged_fields)
     writer.write_i16(54); // api_key
-    writer.write_i16(0);  // api_version
-    writer.write_i32(1);  // correlation_id
+    writer.write_i16(0); // api_version
+    writer.write_i32(1); // correlation_id
     let client_id = format!("rk-broker-{broker_id}");
     writer.write_nullable_string(Some(&client_id)); // legacy header: nullable_string
 
@@ -615,7 +672,10 @@ fn build_broker_registration_frame(
     writer.write_i32(broker_id);
     writer.write_compact_string(cluster_id);
     // features: empty compact array
-    writer.write_compact_array(&[] as &[(&str, i16, i16)], |_: &mut KafkaWriter<'_>, _: &(&str, i16, i16)| {});
+    writer.write_compact_array(
+        &[] as &[(&str, i16, i16)],
+        |_: &mut KafkaWriter<'_>, _: &(&str, i16, i16)| {},
+    );
     // rack: null
     writer.write_compact_nullable_string(None);
     // host + port
@@ -624,7 +684,10 @@ fn build_broker_registration_frame(
     // broker_epoch
     writer.write_i64(broker_epoch);
     // endpoints: empty compact array
-    writer.write_compact_array(&[] as &[(i32, i16, String)], |_: &mut KafkaWriter<'_>, _: &(i32, i16, String)| {});
+    writer.write_compact_array(
+        &[] as &[(i32, i16, String)],
+        |_: &mut KafkaWriter<'_>, _: &(i32, i16, String)| {},
+    );
     writer.write_tagged_fields(&[]); // body tagged fields
 
     drop(writer);

@@ -125,12 +125,7 @@ fn murmur2_hash(data: &[u8]) -> u32 {
     let mut i = 0;
 
     while i + 4 <= len {
-        let k = u32::from_le_bytes([
-            data[i],
-            data[i + 1],
-            data[i + 2],
-            data[i + 3],
-        ]);
+        let k = u32::from_le_bytes([data[i], data[i + 1], data[i + 2], data[i + 3]]);
         h = h.wrapping_add(k.wrapping_mul(m));
         h ^= h >> r;
         h = h.wrapping_mul(m);
@@ -197,7 +192,12 @@ impl KafkaProducer {
     /// 发送消息
     ///
     /// 简化版 API: topic + optional key + value
-    pub async fn send(&self, topic: &str, key: Option<&[u8]>, value: &[u8]) -> ClientResult<RecordMetadata> {
+    pub async fn send(
+        &self,
+        topic: &str,
+        key: Option<&[u8]>,
+        value: &[u8],
+    ) -> ClientResult<RecordMetadata> {
         let record = match key {
             Some(k) => ProducerRecord::with_key(topic, k, value),
             None => ProducerRecord::new(topic, value),
@@ -211,8 +211,12 @@ impl KafkaProducer {
         let partition = match record.partition {
             Some(p) => p,
             None => {
-                let partition_count = self.metadata_cache.get_partition_count(&record.topic).unwrap_or(1);
-                self.partitioner.partition(&record.topic, record.key.as_deref(), partition_count)
+                let partition_count = self
+                    .metadata_cache
+                    .get_partition_count(&record.topic)
+                    .unwrap_or(1);
+                self.partitioner
+                    .partition(&record.topic, record.key.as_deref(), partition_count)
             }
         };
 
@@ -251,7 +255,10 @@ impl KafkaProducer {
     pub async fn close(&self) -> ClientResult<()> {
         self.flush().await?;
         self.connection_pool.close_all().await;
-        info!("Producer closed, total messages sent: {}", self.messages_sent.load(Ordering::Relaxed));
+        info!(
+            "Producer closed, total messages sent: {}",
+            self.messages_sent.load(Ordering::Relaxed)
+        );
         Ok(())
     }
 
@@ -297,8 +304,7 @@ mod tests {
 
     #[test]
     fn test_producer_record_with_header() {
-        let record = ProducerRecord::new("test", b"v")
-            .with_header("h1", b"v1");
+        let record = ProducerRecord::new("test", b"v").with_header("h1", b"v1");
         assert_eq!(record.headers.len(), 1);
         assert_eq!(record.headers[0].0, "h1");
     }
@@ -364,7 +370,10 @@ mod tests {
     async fn test_producer_send_multiple() {
         let producer = test_producer();
         for i in 0..10 {
-            let result = producer.send("test", None, format!("msg-{}", i).as_bytes()).await.unwrap();
+            let result = producer
+                .send("test", None, format!("msg-{}", i).as_bytes())
+                .await
+                .unwrap();
             assert_eq!(result.offset, i as i64);
         }
         assert_eq!(producer.messages_sent(), 10);

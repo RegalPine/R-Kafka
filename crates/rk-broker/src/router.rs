@@ -8,107 +8,107 @@
 use std::sync::Arc;
 
 use bytes::BytesMut;
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use rk_protocol::api_versions::ApiVersionsRequest;
+use rk_protocol::apis::add_partitions_to_txn::AddPartitionsToTxnRequest;
 use rk_protocol::apis::alter_configs::AlterConfigsRequest;
+use rk_protocol::apis::alter_partition_reassignments::AlterPartitionReassignmentsRequest;
+use rk_protocol::apis::begin_quorum_epoch::BeginQuorumEpochRequest;
+use rk_protocol::apis::broker_heartbeat::BrokerHeartbeatRequest;
+use rk_protocol::apis::broker_registration::BrokerRegistrationRequest;
+use rk_protocol::apis::controlled_shutdown::ControlledShutdownRequest;
+use rk_protocol::apis::create_partitions::CreatePartitionsRequest;
 use rk_protocol::apis::create_topics::CreateTopicsRequest;
+use rk_protocol::apis::delete_records::DeleteRecordsRequest;
 use rk_protocol::apis::delete_topics::DeleteTopicsRequest;
+use rk_protocol::apis::describe_cluster::DescribeClusterRequest;
 use rk_protocol::apis::describe_configs::DescribeConfigsRequest;
+use rk_protocol::apis::describe_groups::DescribeGroupsRequest;
+use rk_protocol::apis::describe_producers::DescribeProducersRequest;
+use rk_protocol::apis::describe_quorum::DescribeQuorumRequest;
+use rk_protocol::apis::describe_topics::DescribeTopicsRequest;
+use rk_protocol::apis::elect_leaders::ElectLeadersRequest;
+use rk_protocol::apis::end_quorum_epoch::EndQuorumEpochRequest;
+use rk_protocol::apis::end_txn::EndTxnRequest;
 use rk_protocol::apis::fetch::FetchRequest;
 use rk_protocol::apis::find_coordinator::FindCoordinatorRequest;
+use rk_protocol::apis::heartbeat::HeartbeatRequest;
+use rk_protocol::apis::incremental_alter_configs::IncrementalAlterConfigsRequest;
+use rk_protocol::apis::init_producer_id::InitProducerIdRequest;
+use rk_protocol::apis::join_group::JoinGroupRequest;
+use rk_protocol::apis::leader_and_isr::LeaderAndIsrRequest;
+use rk_protocol::apis::leave_group::LeaveGroupRequest;
+use rk_protocol::apis::list_groups::ListGroupsRequest;
 use rk_protocol::apis::list_offsets::ListOffsetsRequest;
+use rk_protocol::apis::list_partition_reassignments::ListPartitionReassignmentsRequest;
+use rk_protocol::apis::list_transactions::ListTransactionsRequest;
 use rk_protocol::apis::metadata::MetadataRequest;
 use rk_protocol::apis::offset_commit::OffsetCommitRequest;
-use rk_protocol::apis::offset_fetch::OffsetFetchRequest;
-use rk_protocol::apis::produce::ProduceRequest;
-use rk_protocol::apis::join_group::JoinGroupRequest;
-use rk_protocol::apis::sync_group::SyncGroupRequest;
-use rk_protocol::apis::heartbeat::HeartbeatRequest;
-use rk_protocol::apis::leave_group::LeaveGroupRequest;
-use rk_protocol::apis::describe_groups::DescribeGroupsRequest;
-use rk_protocol::apis::list_groups::ListGroupsRequest;
-use rk_protocol::apis::sasl_handshake::SaslHandshakeRequest;
-use rk_protocol::apis::sasl_authenticate::SaslAuthenticateRequest;
-use rk_protocol::apis::init_producer_id::InitProducerIdRequest;
-use rk_protocol::apis::offset_for_leader_epoch::OffsetForLeaderEpochRequest;
-use rk_protocol::apis::add_partitions_to_txn::AddPartitionsToTxnRequest;
-use rk_protocol::apis::end_txn::EndTxnRequest;
-use rk_protocol::apis::delete_records::DeleteRecordsRequest;
-use rk_protocol::apis::elect_leaders::ElectLeadersRequest;
 use rk_protocol::apis::offset_delete::OffsetDeleteRequest;
-use rk_protocol::apis::describe_producers::DescribeProducersRequest;
-use rk_protocol::apis::list_transactions::ListTransactionsRequest;
-use rk_protocol::apis::describe_cluster::DescribeClusterRequest;
-use rk_protocol::apis::alter_partition_reassignments::AlterPartitionReassignmentsRequest;
-use rk_protocol::apis::list_partition_reassignments::ListPartitionReassignmentsRequest;
-use rk_protocol::apis::create_partitions::CreatePartitionsRequest;
-use rk_protocol::apis::incremental_alter_configs::IncrementalAlterConfigsRequest;
-use rk_protocol::apis::describe_topics::DescribeTopicsRequest;
-use rk_protocol::apis::describe_quorum::DescribeQuorumRequest;
-use rk_protocol::apis::leader_and_isr::LeaderAndIsrRequest;
+use rk_protocol::apis::offset_fetch::OffsetFetchRequest;
+use rk_protocol::apis::offset_for_leader_epoch::OffsetForLeaderEpochRequest;
+use rk_protocol::apis::produce::ProduceRequest;
+use rk_protocol::apis::sasl_authenticate::SaslAuthenticateRequest;
+use rk_protocol::apis::sasl_handshake::SaslHandshakeRequest;
 use rk_protocol::apis::stop_replica::StopReplicaRequest;
+use rk_protocol::apis::sync_group::SyncGroupRequest;
 use rk_protocol::apis::update_metadata::UpdateMetadataRequest;
-use rk_protocol::apis::controlled_shutdown::ControlledShutdownRequest;
-use rk_protocol::apis::broker_registration::BrokerRegistrationRequest;
-use rk_protocol::apis::broker_heartbeat::BrokerHeartbeatRequest;
 use rk_protocol::apis::vote::VoteRequest;
-use rk_protocol::apis::begin_quorum_epoch::BeginQuorumEpochRequest;
-use rk_protocol::apis::end_quorum_epoch::EndQuorumEpochRequest;
-use rk_protocol::codec::{KafkaRequestDecoder, encode_response};
+use rk_protocol::codec::{encode_response, KafkaRequestDecoder};
 use rk_protocol::types::{KafkaReader, KafkaWriter};
 use rk_protocol::{RequestContext, ResponseHeader};
 use tracing::error;
 
+use crate::add_partitions_to_txn_handler::AddPartitionsToTxnHandler;
 use crate::alter_configs_handler::AlterConfigsHandler;
+use crate::alter_partition_reassignments_handler::AlterPartitionReassignmentsHandler;
 use crate::api_versions_handler::ApiVersionsHandler;
+use crate::begin_quorum_epoch_handler::BeginQuorumEpochHandler;
+use crate::broker_heartbeat_handler::BrokerHeartbeatHandler;
+use crate::broker_registration_handler::BrokerRegistrationHandler;
+use crate::controlled_shutdown_handler::ControlledShutdownHandler;
+use crate::create_partitions_handler::CreatePartitionsHandler;
 use crate::create_topics_handler::CreateTopicsHandler;
+use crate::delete_records_handler::DeleteRecordsHandler;
 use crate::delete_topics_handler::DeleteTopicsHandler;
+use crate::describe_cluster_handler::DescribeClusterHandler;
 use crate::describe_configs_handler::DescribeConfigsHandler;
+use crate::describe_groups_handler::DescribeGroupsHandler;
+use crate::describe_producers_handler::DescribeProducersHandler;
+use crate::describe_quorum_handler::DescribeQuorumHandler;
+use crate::describe_topics_handler::DescribeTopicsHandler;
+use crate::elect_leaders_handler::ElectLeadersHandler;
+use crate::end_quorum_epoch_handler::EndQuorumEpochHandler;
+use crate::end_txn_handler::EndTxnHandler;
 use crate::fetch::FetchHandler;
 use crate::find_coordinator_handler::FindCoordinatorHandler;
+use crate::group_manager::GroupManager;
+use crate::heartbeat_handler::HeartbeatHandler;
+use crate::incremental_alter_configs_handler::IncrementalAlterConfigsHandler;
+use crate::init_producer_id_handler::InitProducerIdHandler;
+use crate::join_group_handler::JoinGroupHandler;
+use crate::leader_and_isr_handler::LeaderAndIsrHandler;
+use crate::leave_group_handler::LeaveGroupHandler;
+use crate::list_groups_handler::ListGroupsHandler;
 use crate::list_offsets_handler::ListOffsetsHandler;
+use crate::list_partition_reassignments_handler::ListPartitionReassignmentsHandler;
+use crate::list_transactions_handler::ListTransactionsHandler;
 use crate::metadata_handler::MetadataHandler;
 use crate::offset_commit_handler::OffsetCommitHandler;
-use crate::offset_fetch_handler::OffsetFetchHandler;
-use crate::offset_manager::OffsetManager;
-use crate::group_manager::GroupManager;
-use crate::join_group_handler::JoinGroupHandler;
-use crate::sync_group_handler::SyncGroupHandler;
-use crate::heartbeat_handler::HeartbeatHandler;
-use crate::leave_group_handler::LeaveGroupHandler;
-use crate::describe_groups_handler::DescribeGroupsHandler;
-use crate::list_groups_handler::ListGroupsHandler;
-use crate::sasl_authenticator::SaslAuthenticator;
-use crate::sasl_handshake_handler::SaslHandshakeHandler;
-use crate::sasl_authenticate_handler::SaslAuthenticateHandler;
-use crate::init_producer_id_handler::InitProducerIdHandler;
-use crate::offset_for_leader_epoch_handler::OffsetForLeaderEpochHandler;
-use crate::producer_state_manager::ProducerStateManager;
-use crate::add_partitions_to_txn_handler::AddPartitionsToTxnHandler;
-use crate::end_txn_handler::EndTxnHandler;
-use crate::delete_records_handler::DeleteRecordsHandler;
-use crate::elect_leaders_handler::ElectLeadersHandler;
 use crate::offset_delete_handler::OffsetDeleteHandler;
-use crate::describe_producers_handler::DescribeProducersHandler;
-use crate::list_transactions_handler::ListTransactionsHandler;
-use crate::describe_cluster_handler::DescribeClusterHandler;
-use crate::alter_partition_reassignments_handler::AlterPartitionReassignmentsHandler;
-use crate::list_partition_reassignments_handler::ListPartitionReassignmentsHandler;
-use crate::create_partitions_handler::CreatePartitionsHandler;
-use crate::incremental_alter_configs_handler::IncrementalAlterConfigsHandler;
-use crate::describe_topics_handler::DescribeTopicsHandler;
-use crate::describe_quorum_handler::DescribeQuorumHandler;
-use crate::leader_and_isr_handler::LeaderAndIsrHandler;
-use crate::stop_replica_handler::StopReplicaHandler;
-use crate::update_metadata_handler::UpdateMetadataHandler;
-use crate::controlled_shutdown_handler::ControlledShutdownHandler;
-use crate::broker_registration_handler::BrokerRegistrationHandler;
-use crate::broker_heartbeat_handler::BrokerHeartbeatHandler;
-use crate::vote_handler::VoteHandler;
-use crate::begin_quorum_epoch_handler::BeginQuorumEpochHandler;
-use crate::end_quorum_epoch_handler::EndQuorumEpochHandler;
+use crate::offset_fetch_handler::OffsetFetchHandler;
+use crate::offset_for_leader_epoch_handler::OffsetForLeaderEpochHandler;
+use crate::offset_manager::OffsetManager;
 use crate::partition::PartitionManager;
 use crate::produce::ProduceHandler;
+use crate::producer_state_manager::ProducerStateManager;
+use crate::sasl_authenticate_handler::SaslAuthenticateHandler;
+use crate::sasl_authenticator::SaslAuthenticator;
+use crate::sasl_handshake_handler::SaslHandshakeHandler;
+use crate::stop_replica_handler::StopReplicaHandler;
+use crate::sync_group_handler::SyncGroupHandler;
+use crate::update_metadata_handler::UpdateMetadataHandler;
+use crate::vote_handler::VoteHandler;
 
 /// Broker 请求路由器: 聚合所有 Handler
 pub struct BrokerRouter {
@@ -213,6 +213,7 @@ impl BrokerRouter {
     }
 
     /// 创建 BrokerRouter (完整配置，含 SASL)
+    #[allow(clippy::too_many_arguments)]
     pub fn with_sasl_config(
         partition_manager: Arc<PartitionManager>,
         broker_id: i32,
@@ -259,29 +260,40 @@ impl BrokerRouter {
             sasl_handshake_handler: SaslHandshakeHandler::new(authenticator.clone()),
             sasl_authenticate_handler: SaslAuthenticateHandler::new(authenticator.clone()),
             init_producer_id_handler: InitProducerIdHandler::new(),
-            offset_for_leader_epoch_handler: OffsetForLeaderEpochHandler::new(partition_manager.clone()),
-            add_partitions_to_txn_handler: AddPartitionsToTxnHandler::new(producer_state_manager.clone()),
+            offset_for_leader_epoch_handler: OffsetForLeaderEpochHandler::new(
+                partition_manager.clone(),
+            ),
+            add_partitions_to_txn_handler: AddPartitionsToTxnHandler::new(
+                producer_state_manager.clone(),
+            ),
             end_txn_handler: EndTxnHandler::new(producer_state_manager.clone()),
             delete_records_handler: DeleteRecordsHandler::new(partition_manager.clone()),
             elect_leaders_handler: ElectLeadersHandler::new(partition_manager.clone()),
             offset_delete_handler: OffsetDeleteHandler::new(offset_manager.clone()),
-            describe_producers_handler: DescribeProducersHandler::new(partition_manager.clone(), producer_state_manager.clone()),
+            describe_producers_handler: DescribeProducersHandler::new(
+                partition_manager.clone(),
+                producer_state_manager.clone(),
+            ),
             list_transactions_handler: ListTransactionsHandler::new(producer_state_manager.clone()),
             describe_cluster_handler: DescribeClusterHandler::new(
-                i32::from(broker_id),
+                broker_id,
                 broker_host.clone(),
                 broker_port,
-                cluster_id.clone().unwrap_or_else(|| "r-kafka-cluster".to_string()),
+                cluster_id
+                    .clone()
+                    .unwrap_or_else(|| "r-kafka-cluster".to_string()),
             ),
             alter_partition_reassignments_handler: AlterPartitionReassignmentsHandler::new(),
             list_partition_reassignments_handler: ListPartitionReassignmentsHandler::new(),
-            incremental_alter_configs_handler: IncrementalAlterConfigsHandler::new(partition_manager.clone()),
+            incremental_alter_configs_handler: IncrementalAlterConfigsHandler::new(
+                partition_manager.clone(),
+            ),
             describe_topics_handler: DescribeTopicsHandler::new(
-                i32::from(broker_id),
+                broker_id,
                 partition_manager.clone(),
             ),
             describe_quorum_handler: DescribeQuorumHandler::new(
-                i32::from(broker_id),
+                broker_id,
                 partition_manager.clone(),
             ),
             create_partitions_handler: CreatePartitionsHandler::new(partition_manager),
@@ -399,11 +411,7 @@ impl BrokerRouter {
     /// 处理原始请求字节，返回完整响应帧 (ResponseHeader + ResponseBody)
     ///
     /// `body_bytes` 为 Request Header 之后的请求体
-    pub fn handle_request(
-        &self,
-        ctx: &RequestContext,
-        body_bytes: &[u8],
-    ) -> Result<Vec<u8>> {
+    pub fn handle_request(&self, ctx: &RequestContext, body_bytes: &[u8]) -> Result<Vec<u8>> {
         // 记录请求指标
         self.metrics.record_request(ctx.api_key);
 
@@ -429,7 +437,6 @@ impl BrokerRouter {
         let mut writer = KafkaWriter::new(&mut result);
         let header = ResponseHeader::new(ctx.correlation_id);
         header.encode(&mut writer, is_flexible);
-        drop(writer);
         result.extend_from_slice(&response_body);
 
         Ok(result.to_vec())
@@ -455,11 +462,7 @@ impl BrokerRouter {
     }
 
     /// 编码响应体 (不含 ResponseHeader)
-    fn encode_response_body(
-        &self,
-        ctx: &RequestContext,
-        body_bytes: &[u8],
-    ) -> Result<Vec<u8>> {
+    fn encode_response_body(&self, ctx: &RequestContext, body_bytes: &[u8]) -> Result<Vec<u8>> {
         match ctx.api_key {
             // Produce (0)
             0 => {
@@ -497,7 +500,9 @@ impl BrokerRouter {
             8 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = OffsetCommitRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.offset_commit_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .offset_commit_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -513,7 +518,9 @@ impl BrokerRouter {
             10 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = FindCoordinatorRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.find_coordinator_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .find_coordinator_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -553,7 +560,9 @@ impl BrokerRouter {
             15 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = DescribeGroupsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.describe_groups_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .describe_groups_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -569,7 +578,9 @@ impl BrokerRouter {
             17 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = SaslHandshakeRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.sasl_handshake_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .sasl_handshake_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -585,7 +596,9 @@ impl BrokerRouter {
             19 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = CreateTopicsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.create_topics_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .create_topics_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -593,7 +606,9 @@ impl BrokerRouter {
             20 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = DeleteTopicsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.delete_topics_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .delete_topics_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -601,7 +616,9 @@ impl BrokerRouter {
             21 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = DeleteRecordsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.delete_records_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .delete_records_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -609,7 +626,9 @@ impl BrokerRouter {
             22 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = InitProducerIdRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.init_producer_id_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .init_producer_id_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -617,7 +636,9 @@ impl BrokerRouter {
             23 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = OffsetForLeaderEpochRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.offset_for_leader_epoch_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .offset_for_leader_epoch_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -625,7 +646,9 @@ impl BrokerRouter {
             24 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = AddPartitionsToTxnRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.add_partitions_to_txn_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .add_partitions_to_txn_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -641,7 +664,9 @@ impl BrokerRouter {
             32 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = DescribeConfigsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.describe_configs_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .describe_configs_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -649,7 +674,9 @@ impl BrokerRouter {
             33 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = AlterConfigsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.alter_configs_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .alter_configs_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -657,7 +684,9 @@ impl BrokerRouter {
             36 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = SaslAuthenticateRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.sasl_authenticate_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .sasl_authenticate_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -665,7 +694,9 @@ impl BrokerRouter {
             37 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = CreatePartitionsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.create_partitions_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .create_partitions_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -673,7 +704,9 @@ impl BrokerRouter {
             43 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = ElectLeadersRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.elect_leaders_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .elect_leaders_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -681,7 +714,9 @@ impl BrokerRouter {
             47 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = OffsetDeleteRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.offset_delete_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .offset_delete_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -689,7 +724,9 @@ impl BrokerRouter {
             61 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = DescribeProducersRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.describe_producers_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .describe_producers_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -697,23 +734,31 @@ impl BrokerRouter {
             65 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = ListTransactionsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.list_transactions_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .list_transactions_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
             // AlterPartitionReassignments (45)
             45 => {
                 let mut reader = KafkaReader::new(body_bytes);
-                let request = AlterPartitionReassignmentsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.alter_partition_reassignments_handler.handle(request, ctx.api_version)?;
+                let request =
+                    AlterPartitionReassignmentsRequest::decode(&mut reader, ctx.api_version)?;
+                let response = self
+                    .alter_partition_reassignments_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
             // ListPartitionReassignments (46)
             46 => {
                 let mut reader = KafkaReader::new(body_bytes);
-                let request = ListPartitionReassignmentsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.list_partition_reassignments_handler.handle(request, ctx.api_version)?;
+                let request =
+                    ListPartitionReassignmentsRequest::decode(&mut reader, ctx.api_version)?;
+                let response = self
+                    .list_partition_reassignments_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -721,7 +766,9 @@ impl BrokerRouter {
             60 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = DescribeClusterRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.describe_cluster_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .describe_cluster_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -729,7 +776,9 @@ impl BrokerRouter {
             44 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = IncrementalAlterConfigsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.incremental_alter_configs_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .incremental_alter_configs_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -737,7 +786,9 @@ impl BrokerRouter {
             70 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = DescribeTopicsRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.describe_topics_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .describe_topics_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -753,7 +804,9 @@ impl BrokerRouter {
             52 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = BeginQuorumEpochRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.begin_quorum_epoch_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .begin_quorum_epoch_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -761,7 +814,9 @@ impl BrokerRouter {
             53 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = EndQuorumEpochRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.end_quorum_epoch_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .end_quorum_epoch_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -769,7 +824,9 @@ impl BrokerRouter {
             56 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = DescribeQuorumRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.describe_quorum_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .describe_quorum_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -777,7 +834,9 @@ impl BrokerRouter {
             4 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = LeaderAndIsrRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.leader_and_isr_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .leader_and_isr_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -793,7 +852,9 @@ impl BrokerRouter {
             6 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = UpdateMetadataRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.update_metadata_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .update_metadata_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -801,7 +862,9 @@ impl BrokerRouter {
             7 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = ControlledShutdownRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.controlled_shutdown_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .controlled_shutdown_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -809,7 +872,9 @@ impl BrokerRouter {
             54 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = BrokerRegistrationRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.broker_registration_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .broker_registration_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -817,7 +882,9 @@ impl BrokerRouter {
             55 => {
                 let mut reader = KafkaReader::new(body_bytes);
                 let request = BrokerHeartbeatRequest::decode(&mut reader, ctx.api_version)?;
-                let response = self.broker_heartbeat_handler.handle(request, ctx.api_version)?;
+                let response = self
+                    .broker_heartbeat_handler
+                    .handle(request, ctx.api_version)?;
                 let encoded = encode_response(&response, ctx.api_version)?;
                 Ok(encoded.to_vec())
             }
@@ -837,27 +904,45 @@ impl BrokerRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rk_protocol::apis::produce::*;
     use rk_protocol::apis::offset_commit::*;
     use rk_protocol::apis::offset_fetch::*;
+    use rk_protocol::apis::produce::*;
     use rk_protocol::error_codes::KafkaErrorCode;
     use rk_storage::log_io::build_batch_bytes;
     use tempfile::tempdir;
 
     fn make_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10];
-        build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+        build_batch_bytes(
+            base_offset,
+            1,
+            0,
+            1000,
+            2000,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
+        )
     }
 
     fn make_router() -> BrokerRouter {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(
-            PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1)
-        );
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test-topic", 3);
 
         BrokerRouter::new(
-            pm, 1, "localhost".to_string(), 9092, None, Some("test-cluster".to_string()),
+            pm,
+            1,
+            "localhost".to_string(),
+            9092,
+            None,
+            Some("test-cluster".to_string()),
         )
     }
 
@@ -880,7 +965,10 @@ mod tests {
 
         let response = router.produce_handler.handle(request, 0).unwrap();
         assert_eq!(response.topics.len(), 1);
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         assert_eq!(response.topics[0].partitions[0].base_offset, 0);
     }
 
@@ -962,10 +1050,12 @@ mod tests {
             isolation_level: 0,
             topics: vec![rk_protocol::apis::list_offsets::ListOffsetsRequestTopic {
                 name: "test-topic".to_string(),
-                partitions: vec![rk_protocol::apis::list_offsets::ListOffsetsRequestPartition {
-                    index: 0,
-                    timestamp: -1,
-                }],
+                partitions: vec![
+                    rk_protocol::apis::list_offsets::ListOffsetsRequestPartition {
+                        index: 0,
+                        timestamp: -1,
+                    },
+                ],
             }],
         };
         let list_resp = router.list_offsets_handler.handle(list_req, 1).unwrap();
@@ -1006,7 +1096,9 @@ mod tests {
     #[test]
     fn test_broker_router_delete_topics() {
         let router = make_router();
-        router.partition_manager().get_or_create_topic("to-delete", 1);
+        router
+            .partition_manager()
+            .get_or_create_topic("to-delete", 1);
 
         let request = DeleteTopicsRequest {
             topic_names: vec!["to-delete".to_string()],
@@ -1034,11 +1126,13 @@ mod tests {
     fn test_broker_router_describe_configs() {
         let router = make_router();
         let request = DescribeConfigsRequest {
-            resources: vec![rk_protocol::apis::describe_configs::DescribeConfigsRequestResource {
-                resource_type: 2,
-                resource_name: "test-topic".to_string(),
-                config_names: Some(vec!["retention.ms".to_string()]),
-            }],
+            resources: vec![
+                rk_protocol::apis::describe_configs::DescribeConfigsRequestResource {
+                    resource_type: 2,
+                    resource_name: "test-topic".to_string(),
+                    config_names: Some(vec!["retention.ms".to_string()]),
+                },
+            ],
             include_synonyms: false,
         };
         let response = router.describe_configs_handler.handle(request, 0).unwrap();
@@ -1051,14 +1145,18 @@ mod tests {
     fn test_broker_router_alter_configs() {
         let router = make_router();
         let request = AlterConfigsRequest {
-            resources: vec![rk_protocol::apis::alter_configs::AlterConfigsRequestResource {
-                resource_type: 2,
-                resource_name: "test-topic".to_string(),
-                configs: vec![rk_protocol::apis::alter_configs::AlterConfigsRequestConfig {
-                    name: "retention.ms".to_string(),
-                    value: Some("3600000".to_string()),
-                }],
-            }],
+            resources: vec![
+                rk_protocol::apis::alter_configs::AlterConfigsRequestResource {
+                    resource_type: 2,
+                    resource_name: "test-topic".to_string(),
+                    configs: vec![
+                        rk_protocol::apis::alter_configs::AlterConfigsRequestConfig {
+                            name: "retention.ms".to_string(),
+                            value: Some("3600000".to_string()),
+                        },
+                    ],
+                },
+            ],
             validate_only: false,
         };
         let response = router.alter_configs_handler.handle(request, 0).unwrap();
@@ -1097,8 +1195,14 @@ mod tests {
             }],
         };
         let commit_resp = router.offset_commit_handler.handle(commit_req, 0).unwrap();
-        assert_eq!(commit_resp.topics[0].partitions[0].error_code, KafkaErrorCode::None);
-        assert_eq!(commit_resp.topics[0].partitions[1].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            commit_resp.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
+        assert_eq!(
+            commit_resp.topics[0].partitions[1].error_code,
+            KafkaErrorCode::None
+        );
 
         // 2. OffsetFetch: 查询指定 partition
         let fetch_req = OffsetFetchRequest {

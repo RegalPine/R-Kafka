@@ -26,38 +26,36 @@
 //! └─────────────────────────────────────────────────┘
 //! ```
 
-pub mod raft_node;
-pub mod metadata_sm;
-pub mod metadata_record;
 pub mod broker_reg;
-pub mod partition_alloc;
 pub mod cluster_bootstrap;
-pub mod rack_awareness;
-pub mod replica_placement;
 pub mod feature_manager;
+pub mod metadata_record;
+pub mod metadata_sm;
+pub mod partition_alloc;
+pub mod rack_awareness;
+pub mod raft_node;
+pub mod replica_placement;
 
 // Re-exports
-pub use raft_node::{TypeConfig, RaftNode, LocalNode, NodeRole, LogEntry};
-pub use metadata_sm::{
-    MetadataStateMachine, MetadataSnapshot, TopicMetadata, PartitionMetadata, BrokerMetadata,
-};
-pub use metadata_record::{
-    MetadataRecord, RecordType, MetadataLog, MetadataLogEntry,
-};
-pub use broker_reg::{BrokerRegistry, BrokerRegistration, BrokerHeartbeatState};
-pub use partition_alloc::{
-    PartitionAllocator, PartitionAssignment, AllocationStrategy, AllocationError, BrokerInfo,
-};
+pub use broker_reg::{BrokerHeartbeatState, BrokerRegistration, BrokerRegistry};
 pub use cluster_bootstrap::{
-    ClusterState, ClusterBootstrapConfig, ClusterBootstrap, ClusterBootstrapSummary,
-    initialize_cluster_metadata,
+    initialize_cluster_metadata, ClusterBootstrap, ClusterBootstrapConfig, ClusterBootstrapSummary,
+    ClusterState,
+};
+pub use feature_manager::{BrokerFeature, FeatureManager, FinalizedFeature};
+pub use metadata_record::{MetadataLog, MetadataLogEntry, MetadataRecord, RecordType};
+pub use metadata_sm::{
+    BrokerMetadata, MetadataSnapshot, MetadataStateMachine, PartitionMetadata, TopicMetadata,
+};
+pub use partition_alloc::{
+    AllocationError, AllocationStrategy, BrokerInfo, PartitionAllocator, PartitionAssignment,
 };
 pub use rack_awareness::{
-    RackId, BrokerRackInfo, RackTopology, RackTopologySummary,
-    RackViolation, RackAwareConfig, LeaderDistribution,
+    BrokerRackInfo, LeaderDistribution, RackAwareConfig, RackId, RackTopology, RackTopologySummary,
+    RackViolation,
 };
+pub use raft_node::{LocalNode, LogEntry, NodeRole, RaftNode, TypeConfig};
 pub use replica_placement::{
-    PlacementStrategy, PlacementPlan, PlacementStats, PlacementError,
-    ReplicaPlacer, ReassignmentPlan, compute_reassignment,
+    compute_reassignment, PlacementError, PlacementPlan, PlacementStats, PlacementStrategy,
+    ReassignmentPlan, ReplicaPlacer,
 };
-pub use feature_manager::{FeatureManager, BrokerFeature, FinalizedFeature};

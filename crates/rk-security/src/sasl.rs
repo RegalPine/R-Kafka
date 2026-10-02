@@ -37,10 +37,10 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use hmac::{Hmac, Mac};
-use sha2::{Sha256, Sha512, Digest};
+use sha2::{Digest, Sha256, Sha512};
 use tracing::{debug, info, warn};
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 
 // ─── SASL 机制 ──────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ impl std::fmt::Display for SaslMechanism {
 
 impl SaslMechanism {
     /// 从字符串解析
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_uppercase().as_str() {
             "PLAIN" => Some(SaslMechanism::Plain),
             "SCRAM-SHA-256" => Some(SaslMechanism::ScramSha256),
@@ -127,11 +127,7 @@ impl UserCredentials {
     /// 派生 SCRAM 密钥
     fn derive_scram_keys(&mut self) {
         // SCRAM-SHA-256
-        let salted_password_256 = hi_sha256(
-            self.password.as_bytes(),
-            &self.salt,
-            self.iterations,
-        );
+        let salted_password_256 = hi_sha256(self.password.as_bytes(), &self.salt, self.iterations);
         let client_key_256 = hmac_sha256(&salted_password_256, b"Client Key");
         let stored_key_256 = Sha256::digest(&client_key_256).to_vec();
         let server_key_256 = hmac_sha256(&salted_password_256, b"Server Key");
@@ -139,11 +135,7 @@ impl UserCredentials {
         self.server_key_256 = Some(server_key_256);
 
         // SCRAM-SHA-512
-        let salted_password_512 = hi_sha512(
-            self.password.as_bytes(),
-            &self.salt,
-            self.iterations,
-        );
+        let salted_password_512 = hi_sha512(self.password.as_bytes(), &self.salt, self.iterations);
         let client_key_512 = hmac_sha512(&salted_password_512, b"Client Key");
         let stored_key_512 = Sha512::digest(&client_key_512).to_vec();
         let server_key_512 = hmac_sha512(&salted_password_512, b"Server Key");
@@ -353,9 +345,7 @@ impl SaslSession {
         let parts: Vec<&[u8]> = data.split(|&b| b == 0).collect();
         if parts.len() != 3 {
             self.state = AuthState::Failed;
-            return Err(RkError::Protocol(
-                "Invalid PLAIN auth format".to_string(),
-            ));
+            return Err(RkError::Protocol("Invalid PLAIN auth format".to_string()));
         }
 
         let username = std::str::from_utf8(parts[1])
@@ -366,7 +356,11 @@ impl SaslSession {
         if user_db.verify(username, password) {
             self.state = AuthState::Authenticated;
             self.authenticated_user = Some(username.to_string());
-            info!(username = username, mechanism = "PLAIN", "SASL auth success");
+            info!(
+                username = username,
+                mechanism = "PLAIN",
+                "SASL auth success"
+            );
             Ok(vec![]) // PLAIN 成功返回空
         } else {
             self.state = AuthState::Failed;
@@ -391,30 +385,25 @@ impl SaslSession {
             })
             .collect();
 
-        let username = parts.get("n").ok_or_else(|| {
-            RkError::Protocol("Missing username in SCRAM".to_string())
-        })?;
-        let client_nonce = parts.get("r").ok_or_else(|| {
-            RkError::Protocol("Missing nonce in SCRAM".to_string())
-        })?;
+        let username = parts
+            .get("n")
+            .ok_or_else(|| RkError::Protocol("Missing username in SCRAM".to_string()))?;
+        let client_nonce = parts
+            .get("r")
+            .ok_or_else(|| RkError::Protocol("Missing nonce in SCRAM".to_string()))?;
 
         // 检查用户存在
-        let creds = user_db.get_user(username).ok_or_else(|| {
-            RkError::Protocol(format!("Unknown user: {}", username))
-        })?;
+        let creds = user_db
+            .get_user(username)
+            .ok_or_else(|| RkError::Protocol(format!("Unknown user: {}", username)))?;
 
         // 生成服务端 nonce
         let server_nonce = format!("{}{}", client_nonce, generate_server_nonce());
 
         // 构建 server-first 消息
-        let salt_b64 = base64::Engine::encode(
-            &base64::engine::general_purpose::STANDARD,
-            &creds.salt,
-        );
-        let server_first = format!(
-            "r={},s={},i={}",
-            server_nonce, salt_b64, creds.iterations
-        );
+        let salt_b64 =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &creds.salt);
+        let server_first = format!("r={},s={},i={}", server_nonce, salt_b64, creds.iterations);
 
         // 保存上下文
         self.scram_context = Some(ScramContext {
@@ -422,10 +411,7 @@ impl SaslSession {
             server_nonce: server_nonce.clone(),
             _salt: creds.salt.clone(),
             _iterations: creds.iterations,
-            _auth_message: format!(
-                "n={},r={}",
-                username, client_nonce
-            ),
+            _auth_message: format!("n={},r={}", username, client_nonce),
         });
         self.authenticated_user = Some(username.to_string());
 
@@ -438,17 +424,19 @@ impl SaslSession {
         let client_final = std::str::from_utf8(data)
             .map_err(|_| RkError::Protocol("Invalid SCRAM client-final".to_string()))?;
 
-        let context = self.scram_context.as_ref().ok_or_else(|| {
-            RkError::Protocol("No SCRAM context".to_string())
-        })?;
+        let context = self
+            .scram_context
+            .as_ref()
+            .ok_or_else(|| RkError::Protocol("No SCRAM context".to_string()))?;
 
-        let username = self.authenticated_user.clone().ok_or_else(|| {
-            RkError::Protocol("No authenticated user".to_string())
-        })?;
+        let username = self
+            .authenticated_user
+            .clone()
+            .ok_or_else(|| RkError::Protocol("No authenticated user".to_string()))?;
 
-        let creds = user_db.get_user(&username).ok_or_else(|| {
-            RkError::Protocol(format!("Unknown user: {}", username))
-        })?;
+        let creds = user_db
+            .get_user(&username)
+            .ok_or_else(|| RkError::Protocol(format!("Unknown user: {}", username)))?;
 
         // 解析 client-final: c=channel-binding,r=nonce,p=proof
         let parts: HashMap<&str, &str> = client_final
@@ -459,9 +447,9 @@ impl SaslSession {
             })
             .collect();
 
-        let received_nonce = parts.get("r").ok_or_else(|| {
-            RkError::Protocol("Missing nonce in client-final".to_string())
-        })?;
+        let received_nonce = parts
+            .get("r")
+            .ok_or_else(|| RkError::Protocol("Missing nonce in client-final".to_string()))?;
 
         // 验证 nonce
         if received_nonce != &context.server_nonce {
@@ -482,10 +470,8 @@ impl SaslSession {
 
         let default_key = vec![0u8; 32];
         let server_signature = server_key.unwrap_or(&default_key);
-        let server_sig_b64 = base64::Engine::encode(
-            &base64::engine::general_purpose::STANDARD,
-            server_signature,
-        );
+        let server_sig_b64 =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, server_signature);
 
         let server_final = format!("v={}", server_sig_b64);
 
@@ -584,12 +570,12 @@ mod tests {
 
     #[test]
     fn test_sasl_mechanism_from_str() {
-        assert_eq!(SaslMechanism::from_str("PLAIN"), Some(SaslMechanism::Plain));
+        assert_eq!(SaslMechanism::parse("PLAIN"), Some(SaslMechanism::Plain));
         assert_eq!(
-            SaslMechanism::from_str("SCRAM-SHA-256"),
+            SaslMechanism::parse("SCRAM-SHA-256"),
             Some(SaslMechanism::ScramSha256)
         );
-        assert_eq!(SaslMechanism::from_str("unknown"), None);
+        assert_eq!(SaslMechanism::parse("unknown"), None);
     }
 
     #[test]
@@ -693,10 +679,7 @@ mod tests {
 
     #[test]
     fn test_sasl_config_enabled() {
-        let config = SaslConfig::enabled(vec![
-            SaslMechanism::Plain,
-            SaslMechanism::ScramSha256,
-        ]);
+        let config = SaslConfig::enabled(vec![SaslMechanism::Plain, SaslMechanism::ScramSha256]);
         assert!(config.enabled);
         assert!(config.supports(&SaslMechanism::Plain));
         assert!(config.supports(&SaslMechanism::ScramSha256));
@@ -705,8 +688,8 @@ mod tests {
 
     #[test]
     fn test_sasl_config_with_user_file() {
-        let config = SaslConfig::enabled(vec![SaslMechanism::Plain])
-            .with_user_file("/etc/kafka/users.json");
+        let config =
+            SaslConfig::enabled(vec![SaslMechanism::Plain]).with_user_file("/etc/kafka/users.json");
         assert_eq!(config.user_file, Some("/etc/kafka/users.json".to_string()));
     }
 

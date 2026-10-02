@@ -3,10 +3,10 @@
 //! 描述 Topic 的详细信息 (新版 API, KIP-951)。
 //! v0+ 全部为 Flexible 格式。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -140,10 +140,15 @@ mod tests {
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
         // topics: compact nullable array with 1 element
-        w.write_compact_array(&[DescribeTopicsRequestTopic { name: "t1".to_string() }], |w, t| {
-            w.write_compact_string(&t.name);
-            w.write_tagged_fields(&[]);
-        });
+        w.write_compact_array(
+            &[DescribeTopicsRequestTopic {
+                name: "t1".to_string(),
+            }],
+            |w, t| {
+                w.write_compact_string(&t.name);
+                w.write_tagged_fields(&[]);
+            },
+        );
         w.write_tagged_fields(&[]);
 
         let mut reader = KafkaReader::new(&buf);

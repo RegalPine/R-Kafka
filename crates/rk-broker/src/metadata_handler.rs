@@ -55,15 +55,17 @@ impl MetadataHandler {
         // 确定要返回哪些 topics
         let topic_metas: Vec<MetadataTopic> = if let Some(ref topic_names) = request.topics {
             // 请求指定 topics
-            topic_names.iter().map(|name| {
-                self.build_topic_metadata(name, version)
-            }).collect()
+            topic_names
+                .iter()
+                .map(|name| self.build_topic_metadata(name, version))
+                .collect()
         } else {
             // null = 请求全部 topics (v1+)
             let all_topics = self.partition_manager.list_topics();
-            all_topics.iter().map(|name| {
-                self.build_topic_metadata(&name.0, version)
-            }).collect()
+            all_topics
+                .iter()
+                .map(|name| self.build_topic_metadata(&name.0, version))
+                .collect()
         };
 
         debug!(
@@ -91,16 +93,17 @@ impl MetadataHandler {
             Some(topic_meta) => {
                 let partition_infos = self.partition_manager.get_partition_infos(topic_name);
 
-                let partitions = partition_infos.iter().map(|info| {
-                    MetadataPartition {
+                let partitions = partition_infos
+                    .iter()
+                    .map(|info| MetadataPartition {
                         error_code: KafkaErrorCode::None,
                         partition_index: info.partition_id,
                         leader_id: info.leader,
                         leader_epoch: info.leader_epoch,
                         replica_nodes: info.replicas.clone(),
                         isr_nodes: info.isr.clone(),
-                    }
-                }).collect();
+                    })
+                    .collect();
 
                 MetadataTopic {
                     error_code: KafkaErrorCode::None,
@@ -130,19 +133,37 @@ mod tests {
 
     fn make_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10];
-        build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+        build_batch_bytes(
+            base_offset,
+            1,
+            0,
+            1000,
+            2000,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
+        )
     }
 
     fn make_handler() -> MetadataHandler {
         let dir = tempdir().unwrap();
-        let pm = std::sync::Arc::new(
-            PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1)
-        );
+        let pm = std::sync::Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test-topic", 3);
         pm.append_batch("test-topic", 0, &make_batch(0, 5)).unwrap();
 
         MetadataHandler::new(
-            pm, 1, "localhost".to_string(), 9092, None, Some("r-kafka-cluster".to_string()),
+            pm,
+            1,
+            "localhost".to_string(),
+            9092,
+            None,
+            Some("r-kafka-cluster".to_string()),
         )
     }
 
@@ -189,7 +210,10 @@ mod tests {
 
         let response = handler.handle(request, 0).unwrap();
         assert_eq!(response.topics.len(), 1);
-        assert_eq!(response.topics[0].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            response.topics[0].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 
     #[test]

@@ -3,10 +3,10 @@
 //! Broker 向 Controller 注册自身信息 (KRaft 模式)。
 //! Broker 启动时发送此请求，Controller 将其记录到 Metadata Log。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ─────────────────────────────────────────────────────────
 
@@ -62,7 +62,11 @@ impl KafkaRequestDecoder for BrokerRegistrationRequest {
             let min_version = r.read_i16()?;
             let max_version = r.read_i16()?;
             let _tags = r.read_tagged_fields()?;
-            Ok(BrokerRegistrationFeature { name, min_version, max_version })
+            Ok(BrokerRegistrationFeature {
+                name,
+                min_version,
+                max_version,
+            })
         })?;
         let rack = reader.read_compact_nullable_string()?;
         let host = reader.read_compact_string()?;
@@ -73,12 +77,22 @@ impl KafkaRequestDecoder for BrokerRegistrationRequest {
             let security_protocol = r.read_i16()?;
             let listener_name = r.read_compact_string()?;
             let _tags = r.read_tagged_fields()?;
-            Ok(BrokerRegistrationEndpoint { port, security_protocol, listener_name })
+            Ok(BrokerRegistrationEndpoint {
+                port,
+                security_protocol,
+                listener_name,
+            })
         })?;
         let _tags = reader.read_tagged_fields()?;
         Ok(Self {
-            broker_id, cluster_id, features, rack, host, port,
-            broker_epoch, endpoints,
+            broker_id,
+            cluster_id,
+            features,
+            rack,
+            host,
+            port,
+            broker_epoch,
+            endpoints,
         })
     }
 }
@@ -117,9 +131,9 @@ mod tests {
     fn test_broker_registration_request_decode() {
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
-        w.write_i32(1);                     // broker_id
+        w.write_i32(1); // broker_id
         w.write_compact_string("cluster1"); // cluster_id
-        // features (1 item)
+                                            // features (1 item)
         w.write_compact_array(
             &[("feature1".to_string(), 1i16, 3i16)],
             |w2, (name, min, max)| {
@@ -130,10 +144,10 @@ mod tests {
             },
         );
         w.write_compact_nullable_string(Some("rack1")); // rack
-        w.write_compact_string("host1");                // host
-        w.write_i32(9092);                              // port
-        w.write_i64(42);                                // broker_epoch
-        // endpoints (1 item)
+        w.write_compact_string("host1"); // host
+        w.write_i32(9092); // port
+        w.write_i64(42); // broker_epoch
+                         // endpoints (1 item)
         w.write_compact_array(
             &[(9092i32, 0i16, "PLAINTEXT".to_string())],
             |w2, (port, sp, name)| {
@@ -177,16 +191,22 @@ mod tests {
         let mut w = KafkaWriter::new(&mut buf);
         w.write_i32(2);
         w.write_compact_string("c1");
-        w.write_compact_array(&[] as &[(&str, i16, i16)], |w2: &mut KafkaWriter<'_>, _: &(&str, i16, i16)| {
-            let _ = w2;
-        });
+        w.write_compact_array(
+            &[] as &[(&str, i16, i16)],
+            |w2: &mut KafkaWriter<'_>, _: &(&str, i16, i16)| {
+                let _ = w2;
+            },
+        );
         w.write_compact_nullable_string(None); // null rack
         w.write_compact_string("h");
         w.write_i32(9092);
         w.write_i64(1);
-        w.write_compact_array(&[] as &[(i32, i16, String)], |w2: &mut KafkaWriter<'_>, _: &(i32, i16, String)| {
-            let _ = w2;
-        });
+        w.write_compact_array(
+            &[] as &[(i32, i16, String)],
+            |w2: &mut KafkaWriter<'_>, _: &(i32, i16, String)| {
+                let _ = w2;
+            },
+        );
         w.write_tagged_fields(&[]);
 
         let mut reader = KafkaReader::new(&buf);

@@ -3,10 +3,10 @@
 //! 删除 Topic: 按名称删除。
 //! Phase 1: 仅支持按 topic_name 删除 (v6+ 支持 topic_id)。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -33,7 +33,10 @@ impl KafkaRequestDecoder for DeleteTopicsRequest {
             let _tags = reader.read_tagged_fields()?;
         }
 
-        Ok(Self { topic_names, timeout_ms })
+        Ok(Self {
+            topic_names,
+            timeout_ms,
+        })
     }
 }
 
@@ -100,13 +103,11 @@ mod tests {
 
     #[test]
     fn test_delete_topics_response_encode_v0() {
-        let resp = DeleteTopicsResponse::success(vec![
-            DeleteTopicsResponseTopic {
-                name: "test".to_string(),
-                error_code: KafkaErrorCode::None,
-                error_message: None,
-            },
-        ]);
+        let resp = DeleteTopicsResponse::success(vec![DeleteTopicsResponseTopic {
+            name: "test".to_string(),
+            error_code: KafkaErrorCode::None,
+            error_message: None,
+        }]);
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
         resp.encode(&mut w, 0).unwrap();
@@ -115,13 +116,11 @@ mod tests {
 
     #[test]
     fn test_delete_topics_response_encode_v1() {
-        let resp = DeleteTopicsResponse::success(vec![
-            DeleteTopicsResponseTopic {
-                name: "test".to_string(),
-                error_code: KafkaErrorCode::UnknownTopicOrPartition,
-                error_message: Some("not found".to_string()),
-            },
-        ]);
+        let resp = DeleteTopicsResponse::success(vec![DeleteTopicsResponseTopic {
+            name: "test".to_string(),
+            error_code: KafkaErrorCode::UnknownTopicOrPartition,
+            error_message: Some("not found".to_string()),
+        }]);
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
         resp.encode(&mut w, 1).unwrap();

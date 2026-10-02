@@ -49,7 +49,8 @@ impl AlterConfigsHandler {
 
         for resource in &request.resources {
             match resource.resource_type {
-                2 => { // Topic
+                2 => {
+                    // Topic
                     let result = self.alter_topic_config(
                         &resource.resource_name,
                         &resource.configs,
@@ -62,7 +63,8 @@ impl AlterConfigsHandler {
                         resource_name: resource.resource_name.clone(),
                     });
                 }
-                4 => { // Broker
+                4 => {
+                    // Broker
                     // Phase 1: Broker 配置只读
                     responses.push(AlterConfigsResponseResource {
                         error_code: KafkaErrorCode::InvalidConfig,
@@ -74,7 +76,10 @@ impl AlterConfigsHandler {
                 _ => {
                     responses.push(AlterConfigsResponseResource {
                         error_code: KafkaErrorCode::InvalidRequest,
-                        error_message: Some(format!("Unsupported resource type: {}", resource.resource_type)),
+                        error_message: Some(format!(
+                            "Unsupported resource type: {}",
+                            resource.resource_type
+                        )),
                         resource_type: resource.resource_type,
                         resource_name: resource.resource_name.clone(),
                     });
@@ -96,7 +101,11 @@ impl AlterConfigsHandler {
         validate_only: bool,
     ) -> (KafkaErrorCode, Option<String>) {
         // 检查 topic 是否存在
-        if self.partition_manager.get_topic_metadata(topic_name).is_none() {
+        if self
+            .partition_manager
+            .get_topic_metadata(topic_name)
+            .is_none()
+        {
             return (
                 KafkaErrorCode::UnknownTopicOrPartition,
                 Some(format!("Topic '{}' not found", topic_name)),
@@ -108,13 +117,19 @@ impl AlterConfigsHandler {
             if !MUTABLE_TOPIC_CONFIGS.contains(&config.name.as_str()) {
                 return (
                     KafkaErrorCode::InvalidConfig,
-                    Some(format!("Config '{}' is not mutable or unknown", config.name)),
+                    Some(format!(
+                        "Config '{}' is not mutable or unknown",
+                        config.name
+                    )),
                 );
             }
         }
 
         if validate_only {
-            debug!(topic = topic_name, "Validate-only AlterConfigs, no changes applied");
+            debug!(
+                topic = topic_name,
+                "Validate-only AlterConfigs, no changes applied"
+            );
             return (KafkaErrorCode::None, None);
         }
 
@@ -125,12 +140,14 @@ impl AlterConfigsHandler {
                 config_map.insert(config.name.clone(), value.clone());
             } else {
                 // null value = 删除覆盖, 恢复默认
-                self.partition_manager.remove_topic_config(topic_name, &config.name);
+                self.partition_manager
+                    .remove_topic_config(topic_name, &config.name);
             }
         }
 
         if !config_map.is_empty() {
-            self.partition_manager.set_topic_configs(topic_name, config_map);
+            self.partition_manager
+                .set_topic_configs(topic_name, config_map);
         }
 
         debug!(topic = topic_name, "AlterConfigs applied");
@@ -145,7 +162,11 @@ mod tests {
 
     fn make_handler() -> AlterConfigsHandler {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test-topic", 1);
         AlterConfigsHandler::new(pm)
     }
@@ -168,7 +189,9 @@ mod tests {
         assert_eq!(response.responses[0].error_code, KafkaErrorCode::None);
 
         // 验证配置已生效
-        let val = handler.partition_manager.get_topic_config("test-topic", "retention.ms");
+        let val = handler
+            .partition_manager
+            .get_topic_config("test-topic", "retention.ms");
         assert_eq!(val, Some("3600000".to_string()));
     }
 
@@ -190,7 +213,9 @@ mod tests {
         assert_eq!(response.responses[0].error_code, KafkaErrorCode::None);
 
         // validate_only 不应修改配置
-        let val = handler.partition_manager.get_topic_config("test-topic", "retention.ms");
+        let val = handler
+            .partition_manager
+            .get_topic_config("test-topic", "retention.ms");
         assert_eq!(val, None);
     }
 
@@ -206,7 +231,10 @@ mod tests {
             validate_only: false,
         };
         let response = handler.handle(request, 0).unwrap();
-        assert_eq!(response.responses[0].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            response.responses[0].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 
     #[test]
@@ -224,7 +252,10 @@ mod tests {
             validate_only: false,
         };
         let response = handler.handle(request, 0).unwrap();
-        assert_eq!(response.responses[0].error_code, KafkaErrorCode::InvalidConfig);
+        assert_eq!(
+            response.responses[0].error_code,
+            KafkaErrorCode::InvalidConfig
+        );
     }
 
     #[test]
@@ -239,14 +270,19 @@ mod tests {
             validate_only: false,
         };
         let response = handler.handle(request, 0).unwrap();
-        assert_eq!(response.responses[0].error_code, KafkaErrorCode::InvalidConfig);
+        assert_eq!(
+            response.responses[0].error_code,
+            KafkaErrorCode::InvalidConfig
+        );
     }
 
     #[test]
     fn test_alter_topic_config_null_value_removes() {
         let handler = make_handler();
         // 先设置
-        handler.partition_manager.set_topic_config("test-topic", "retention.ms", "3600000");
+        handler
+            .partition_manager
+            .set_topic_config("test-topic", "retention.ms", "3600000");
 
         // null value 应删除覆盖
         let request = AlterConfigsRequest {
@@ -263,7 +299,9 @@ mod tests {
         let response = handler.handle(request, 0).unwrap();
         assert_eq!(response.responses[0].error_code, KafkaErrorCode::None);
 
-        let val = handler.partition_manager.get_topic_config("test-topic", "retention.ms");
+        let val = handler
+            .partition_manager
+            .get_topic_config("test-topic", "retention.ms");
         assert_eq!(val, None);
     }
 }

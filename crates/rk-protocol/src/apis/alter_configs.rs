@@ -3,10 +3,10 @@
 //! 修改 Broker 或 Topic 运行时配置。
 //! Phase 1: 仅支持 Topic 配置修改 (内存中, 不持久化到元数据日志)。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -42,7 +42,10 @@ impl KafkaRequestDecoder for AlterConfigsRequest {
                     if version >= 2 {
                         let _tags = r2.read_tagged_fields()?;
                     }
-                    Ok(AlterConfigsRequestConfig { name: cn, value: cv })
+                    Ok(AlterConfigsRequestConfig {
+                        name: cn,
+                        value: cv,
+                    })
                 })?;
                 if version >= 2 {
                     let _tags = r.read_tagged_fields()?;
@@ -60,7 +63,10 @@ impl KafkaRequestDecoder for AlterConfigsRequest {
                 let configs = r.read_array(|r2| {
                     let cn = r2.read_string()?;
                     let cv = r2.read_nullable_string()?;
-                    Ok(AlterConfigsRequestConfig { name: cn, value: cv })
+                    Ok(AlterConfigsRequestConfig {
+                        name: cn,
+                        value: cv,
+                    })
                 })?;
                 Ok(AlterConfigsRequestResource {
                     resource_type: rt,
@@ -80,7 +86,10 @@ impl KafkaRequestDecoder for AlterConfigsRequest {
             let _tags = reader.read_tagged_fields()?;
         }
 
-        Ok(Self { resources, validate_only })
+        Ok(Self {
+            resources,
+            validate_only,
+        })
     }
 }
 

@@ -31,21 +31,22 @@ impl ListPartitionReassignmentsHandler {
         // Phase 1: 单 Broker，没有正在进行的重新分配
         // 如果请求指定了 topics，返回空列表；如果 null，也返回空列表
         let response_topics = match request.topics {
-            Some(topics) => {
-                topics.into_iter().map(|topic_req| {
-                    ListPartitionReassignmentsResponseTopic {
-                        name: topic_req.name,
-                        partitions: topic_req.partitions.into_iter().map(|idx| {
-                            ListPartitionReassignmentsResponsePartition {
-                                index: idx,
-                                replicas: vec![],
-                                adding_replicas: vec![],
-                                removing_replicas: vec![],
-                            }
-                        }).collect(),
-                    }
-                }).collect()
-            }
+            Some(topics) => topics
+                .into_iter()
+                .map(|topic_req| ListPartitionReassignmentsResponseTopic {
+                    name: topic_req.name,
+                    partitions: topic_req
+                        .partitions
+                        .into_iter()
+                        .map(|idx| ListPartitionReassignmentsResponsePartition {
+                            index: idx,
+                            replicas: vec![],
+                            adding_replicas: vec![],
+                            removing_replicas: vec![],
+                        })
+                        .collect(),
+                })
+                .collect(),
             None => vec![],
         };
 

@@ -2,10 +2,10 @@
 //!
 //! 为已有 Topic 增加 Partition 数量。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -32,9 +32,8 @@ impl KafkaRequestDecoder for CreatePartitionsRequest {
             let topics = reader.read_compact_array(|r| {
                 let name = r.read_compact_string()?;
                 let new_partitions_count = r.read_i32()?;
-                let assignments = r.read_compact_nullable_array(|r| {
-                    r.read_compact_array(|r| r.read_i32())
-                })?;
+                let assignments =
+                    r.read_compact_nullable_array(|r| r.read_compact_array(|r| r.read_i32()))?;
                 let _tags = r.read_tagged_fields()?;
                 Ok(CreatePartitionsRequestTopic {
                     name,
@@ -45,15 +44,17 @@ impl KafkaRequestDecoder for CreatePartitionsRequest {
             let timeout_ms = reader.read_i32()?;
             let validate_only = reader.read_bool()?;
             let _tags = reader.read_tagged_fields()?;
-            Ok(Self { topics, timeout_ms, validate_only })
+            Ok(Self {
+                topics,
+                timeout_ms,
+                validate_only,
+            })
         } else {
             // Legacy v0-v1
             let topics = reader.read_array(|r| {
                 let name = r.read_string()?;
                 let new_partitions_count = r.read_i32()?;
-                let assignments = r.read_nullable_array(|r| {
-                    r.read_array(|r| r.read_i32())
-                })?;
+                let assignments = r.read_nullable_array(|r| r.read_array(|r| r.read_i32()))?;
                 Ok(CreatePartitionsRequestTopic {
                     name,
                     new_partitions_count,
@@ -61,8 +62,16 @@ impl KafkaRequestDecoder for CreatePartitionsRequest {
                 })
             })?;
             let timeout_ms = reader.read_i32()?;
-            let validate_only = if version >= 1 { reader.read_bool()? } else { false };
-            Ok(Self { topics, timeout_ms, validate_only })
+            let validate_only = if version >= 1 {
+                reader.read_bool()?
+            } else {
+                false
+            };
+            Ok(Self {
+                topics,
+                timeout_ms,
+                validate_only,
+            })
         }
     }
 }
@@ -135,7 +144,7 @@ mod tests {
         w.write_i32(6); // new_partitions_count
         w.write_i32(-1); // assignments: null
         w.write_i32(30000); // timeout_ms
-        // v0: no validate_only
+                            // v0: no validate_only
         let mut r = KafkaReader::new(&buf);
         let req = CreatePartitionsRequest::decode(&mut r, 0).unwrap();
         assert_eq!(req.topics.len(), 1);

@@ -81,11 +81,7 @@ impl ElectLeadersHandler {
 }
 
 /// 检查 topic/partition 是否存在
-fn partition_manager_has_partition(
-    pm: &PartitionManager,
-    topic: &str,
-    partition: i32,
-) -> bool {
+fn partition_manager_has_partition(pm: &PartitionManager, topic: &str, partition: i32) -> bool {
     pm.get_partition_count(topic)
         .map(|count| partition >= 0 && partition < count)
         .unwrap_or(false)
@@ -98,7 +94,11 @@ mod tests {
 
     fn make_handler() -> ElectLeadersHandler {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test", 3);
         ElectLeadersHandler::new(pm)
     }
@@ -135,7 +135,10 @@ mod tests {
             timeout_ms: 30000,
         };
         let resp = handler.handle(req, 0).unwrap();
-        assert_eq!(resp.results[0].partitions[0].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            resp.results[0].partitions[0].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 
     #[test]

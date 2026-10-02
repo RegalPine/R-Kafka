@@ -22,11 +22,7 @@ impl ListGroupsHandler {
     }
 
     /// 处理 ListGroups 请求
-    pub fn handle(
-        &self,
-        request: ListGroupsRequest,
-        _version: i16,
-    ) -> Result<ListGroupsResponse> {
+    pub fn handle(&self, request: ListGroupsRequest, _version: i16) -> Result<ListGroupsResponse> {
         debug!("ListGroups request");
 
         let groups = self.group_manager.list_groups();
@@ -38,8 +34,12 @@ impl ListGroupsHandler {
                 if let Some(states) = &request.states_filter {
                     let state_str = match g.state {
                         crate::group_manager::GroupState::Empty => "Empty",
-                        crate::group_manager::GroupState::PreparingRebalance => "PreparingRebalance",
-                        crate::group_manager::GroupState::CompletingRebalance => "CompletingRebalance",
+                        crate::group_manager::GroupState::PreparingRebalance => {
+                            "PreparingRebalance"
+                        }
+                        crate::group_manager::GroupState::CompletingRebalance => {
+                            "CompletingRebalance"
+                        }
                         crate::group_manager::GroupState::Stable => "Stable",
                         crate::group_manager::GroupState::Dead => "Dead",
                     };
@@ -94,8 +94,10 @@ mod tests {
     fn test_list_groups_handler_with_groups() {
         let gm = Arc::new(GroupManager::new());
 
-        gm.join_group("group-1", "", None, "consumer", vec![]).unwrap();
-        gm.join_group("group-2", "", None, "consumer", vec![]).unwrap();
+        gm.join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
+        gm.join_group("group-2", "", None, "consumer", vec![])
+            .unwrap();
 
         let handler = ListGroupsHandler::new(gm);
 
@@ -111,7 +113,8 @@ mod tests {
     fn test_list_groups_handler_with_filter() {
         let gm = Arc::new(GroupManager::new());
 
-        gm.join_group("group-1", "", None, "consumer", vec![]).unwrap();
+        gm.join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
 
         let handler = ListGroupsHandler::new(gm);
 

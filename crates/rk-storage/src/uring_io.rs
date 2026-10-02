@@ -20,9 +20,10 @@ use tracing::{info, warn};
 // ─── I/O 引擎类型 ────────────────────────────────────────────────────
 
 /// I/O 引擎类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum IoEngine {
     /// 标准文件 I/O (pread/pwrite)
+    #[default]
     Stdio,
     /// Linux io_uring 异步 I/O
     IoUring,
@@ -54,12 +55,6 @@ impl IoEngine {
             IoEngine::Stdio => "stdio",
             IoEngine::IoUring => "io_uring",
         }
-    }
-}
-
-impl Default for IoEngine {
-    fn default() -> Self {
-        IoEngine::Stdio
     }
 }
 
@@ -129,18 +124,24 @@ impl UringWriter {
         let path = path.as_ref().to_path_buf();
 
         let file = if engine == IoEngine::Stdio {
-            Some(std::fs::OpenOptions::new()
-                .create(true)
-                .read(true)
-                .write(true)
-                .open(&path)?)
+            Some(
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .truncate(false)
+                    .read(true)
+                    .write(true)
+                    .open(&path)?,
+            )
         } else {
             // io_uring 模式: 打开文件用于 pwrite/pread
-            Some(std::fs::OpenOptions::new()
-                .create(true)
-                .read(true)
-                .write(true)
-                .open(&path)?)
+            Some(
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .truncate(false)
+                    .read(true)
+                    .write(true)
+                    .open(&path)?,
+            )
         };
 
         // 获取当前文件大小作为初始偏移
@@ -224,9 +225,10 @@ impl UringWriter {
     pub fn read_at(&mut self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
         use std::os::unix::io::AsRawFd;
 
-        let file = self.file.as_ref().ok_or_else(|| {
-            io::Error::new(io::ErrorKind::NotConnected, "File not opened")
-        })?;
+        let file = self
+            .file
+            .as_ref()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "File not opened"))?;
 
         let bytes_read = {
             let fd = file.as_raw_fd();
@@ -325,10 +327,7 @@ pub async fn async_sync(writer: &mut UringWriter) -> io::Result<()> {
 /// # Arguments
 /// * `path` - 文件路径
 /// * `io_engine` - 配置中的引擎名称 ("stdio" | "io_uring")
-pub fn create_writer(
-    path: impl AsRef<Path>,
-    io_engine: &str,
-) -> io::Result<UringWriter> {
+pub fn create_writer(path: impl AsRef<Path>, io_engine: &str) -> io::Result<UringWriter> {
     let engine = IoEngine::from_config(io_engine);
     UringWriter::new(path, engine)
 }

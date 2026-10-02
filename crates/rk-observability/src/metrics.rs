@@ -63,19 +63,20 @@ impl PrometheusMetrics {
         let registry = Registry::new();
 
         // Counters
-        let messages_in_total = IntCounter::with_opts(
-            Opts::new("rk_messages_in_total", "Total number of messages produced"),
-        )
+        let messages_in_total = IntCounter::with_opts(Opts::new(
+            "rk_messages_in_total",
+            "Total number of messages produced",
+        ))
         .expect("metric creation failed");
 
-        let bytes_in_total = IntCounter::with_opts(
-            Opts::new("rk_bytes_in_total", "Total bytes received"),
-        )
-        .expect("metric creation failed");
+        let bytes_in_total =
+            IntCounter::with_opts(Opts::new("rk_bytes_in_total", "Total bytes received"))
+                .expect("metric creation failed");
 
-        let bytes_out_total = IntCounter::with_opts(
-            Opts::new("rk_bytes_out_total", "Total bytes sent to consumers"),
-        )
+        let bytes_out_total = IntCounter::with_opts(Opts::new(
+            "rk_bytes_out_total",
+            "Total bytes sent to consumers",
+        ))
         .expect("metric creation failed");
 
         let requests_total = IntCounterVec::new(
@@ -90,20 +91,23 @@ impl PrometheusMetrics {
         )
         .expect("metric creation failed");
 
-        let produce_messages_total = IntCounter::with_opts(
-            Opts::new("rk_produce_messages_total", "Total messages in produce requests"),
-        )
+        let produce_messages_total = IntCounter::with_opts(Opts::new(
+            "rk_produce_messages_total",
+            "Total messages in produce requests",
+        ))
         .expect("metric creation failed");
 
         // Gauges
-        let active_connections = IntGauge::with_opts(
-            Opts::new("rk_active_connections", "Number of active client connections"),
-        )
+        let active_connections = IntGauge::with_opts(Opts::new(
+            "rk_active_connections",
+            "Number of active client connections",
+        ))
         .expect("metric creation failed");
 
-        let disk_usage_bytes = IntGauge::with_opts(
-            Opts::new("rk_disk_usage_bytes", "Total disk usage in bytes"),
-        )
+        let disk_usage_bytes = IntGauge::with_opts(Opts::new(
+            "rk_disk_usage_bytes",
+            "Total disk usage in bytes",
+        ))
         .expect("metric creation failed");
 
         let replication_lag = IntGaugeVec::new(
@@ -112,31 +116,26 @@ impl PrometheusMetrics {
         )
         .expect("metric creation failed");
 
-        let partition_count = IntGauge::with_opts(
-            Opts::new("rk_partition_count", "Total number of partitions"),
-        )
+        let partition_count = IntGauge::with_opts(Opts::new(
+            "rk_partition_count",
+            "Total number of partitions",
+        ))
         .expect("metric creation failed");
 
-        let topic_count = IntGauge::with_opts(
-            Opts::new("rk_topic_count", "Total number of topics"),
-        )
-        .expect("metric creation failed");
+        let topic_count =
+            IntGauge::with_opts(Opts::new("rk_topic_count", "Total number of topics"))
+                .expect("metric creation failed");
 
-        let under_replicated_partitions = IntGauge::with_opts(
-            Opts::new(
-                "rk_under_replicated_partitions",
-                "Number of under-replicated partitions",
-            ),
-        )
+        let under_replicated_partitions = IntGauge::with_opts(Opts::new(
+            "rk_under_replicated_partitions",
+            "Number of under-replicated partitions",
+        ))
         .expect("metric creation failed");
 
         // Histograms
         let append_latency_seconds = Histogram::with_opts(
-            HistogramOpts::new(
-                "rk_append_latency_seconds",
-                "Log append latency in seconds",
-            )
-            .buckets(vec![0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]),
+            HistogramOpts::new("rk_append_latency_seconds", "Log append latency in seconds")
+                .buckets(vec![0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]),
         )
         .expect("metric creation failed");
 
@@ -154,27 +153,51 @@ impl PrometheusMetrics {
                 "rk_request_latency_seconds",
                 "Request handling latency by API key",
             )
-            .buckets(vec![0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 5.0]),
+            .buckets(vec![
+                0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 5.0,
+            ]),
             &["api_key"],
         )
         .expect("metric creation failed");
 
         // 注册全部指标
-        registry.register(Box::new(messages_in_total.clone())).unwrap();
+        registry
+            .register(Box::new(messages_in_total.clone()))
+            .unwrap();
         registry.register(Box::new(bytes_in_total.clone())).unwrap();
-        registry.register(Box::new(bytes_out_total.clone())).unwrap();
+        registry
+            .register(Box::new(bytes_out_total.clone()))
+            .unwrap();
         registry.register(Box::new(requests_total.clone())).unwrap();
         registry.register(Box::new(errors_total.clone())).unwrap();
-        registry.register(Box::new(produce_messages_total.clone())).unwrap();
-        registry.register(Box::new(active_connections.clone())).unwrap();
-        registry.register(Box::new(disk_usage_bytes.clone())).unwrap();
-        registry.register(Box::new(replication_lag.clone())).unwrap();
-        registry.register(Box::new(partition_count.clone())).unwrap();
+        registry
+            .register(Box::new(produce_messages_total.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(active_connections.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(disk_usage_bytes.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(replication_lag.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(partition_count.clone()))
+            .unwrap();
         registry.register(Box::new(topic_count.clone())).unwrap();
-        registry.register(Box::new(under_replicated_partitions.clone())).unwrap();
-        registry.register(Box::new(append_latency_seconds.clone())).unwrap();
-        registry.register(Box::new(fetch_latency_seconds.clone())).unwrap();
-        registry.register(Box::new(request_latency_seconds.clone())).unwrap();
+        registry
+            .register(Box::new(under_replicated_partitions.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(append_latency_seconds.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(fetch_latency_seconds.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(request_latency_seconds.clone()))
+            .unwrap();
 
         Self {
             registry,

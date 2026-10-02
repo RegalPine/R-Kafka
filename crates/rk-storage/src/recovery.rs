@@ -9,10 +9,10 @@
 //! 6. 重建 Offset Index 和 Time Index
 //! 7. 恢复 High Watermark (从 Replica 状态，不在本模块)
 
-use std::fs::{self, File, OpenOptions};
-use std::path::Path;
 use rk_core::error::Result;
 use rk_core::types::{Offset, PartitionId, TopicName};
+use std::fs::{self, File, OpenOptions};
+use std::path::Path;
 
 use crate::commitlog::CommitLog;
 use crate::log_io;
@@ -46,12 +46,15 @@ pub fn recover_partition(
         // 全新 Partition
         let cl = CommitLog::create(data_dir, topic, partition, segment_max_size)?;
         let leo = cl.log_end_offset();
-        return Ok((cl, RecoveryResult {
-            log_end_offset: leo,
-            batches_scanned: 0,
-            bytes_truncated: 0,
-            segments_recovered: 1,
-        }));
+        return Ok((
+            cl,
+            RecoveryResult {
+                log_end_offset: leo,
+                batches_scanned: 0,
+                bytes_truncated: 0,
+                segments_recovered: 1,
+            },
+        ));
     }
 
     // 扫描 .log 文件
@@ -71,12 +74,15 @@ pub fn recover_partition(
     if base_offsets.is_empty() {
         let cl = CommitLog::create(data_dir, topic, partition, segment_max_size)?;
         let leo = cl.log_end_offset();
-        return Ok((cl, RecoveryResult {
-            log_end_offset: leo,
-            batches_scanned: 0,
-            bytes_truncated: 0,
-            segments_recovered: 1,
-        }));
+        return Ok((
+            cl,
+            RecoveryResult {
+                log_end_offset: leo,
+                batches_scanned: 0,
+                bytes_truncated: 0,
+                segments_recovered: 1,
+            },
+        ));
     }
 
     // 恢复每个 Segment
@@ -93,9 +99,10 @@ pub fn recover_partition(
         // 扫描有效 batch
         let mut file = File::open(&log_path)?;
         let valid_batches = log_io::scan_batches_from_file(&mut file, 0, file_size);
-        let valid_end = valid_batches.last().map(|(pos, bytes)| {
-            pos + bytes.len() as u64
-        }).unwrap_or(0);
+        let valid_end = valid_batches
+            .last()
+            .map(|(pos, bytes)| pos + bytes.len() as u64)
+            .unwrap_or(0);
 
         total_batches += valid_batches.len() as u64;
 
@@ -114,20 +121,21 @@ pub fn recover_partition(
     let cl = CommitLog::recover(data_dir, topic, partition, segment_max_size)?;
     let leo = cl.log_end_offset();
 
-    Ok((cl, RecoveryResult {
-        log_end_offset: leo,
-        batches_scanned: total_batches,
-        bytes_truncated: total_truncated,
-        segments_recovered: base_offsets.len(),
-    }))
+    Ok((
+        cl,
+        RecoveryResult {
+            log_end_offset: leo,
+            batches_scanned: total_batches,
+            bytes_truncated: total_truncated,
+            segments_recovered: base_offsets.len(),
+        },
+    ))
 }
 
 /// 验证单个 Segment 文件的数据完整性
 ///
 /// 返回 (有效 batch 数, 有效字节数, 损坏字节数)
-pub fn verify_segment_integrity(
-    log_path: &Path,
-) -> Result<(u64, u64, u64)> {
+pub fn verify_segment_integrity(log_path: &Path) -> Result<(u64, u64, u64)> {
     let file_size = fs::metadata(log_path)?.len();
     let mut file = File::open(log_path)?;
     let valid_batches = log_io::scan_batches_from_file(&mut file, 0, file_size);
@@ -151,7 +159,18 @@ mod tests {
 
     fn make_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10];
-        build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+        build_batch_bytes(
+            base_offset,
+            1,
+            0,
+            1000,
+            2000,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
+        )
     }
 
     #[test]
@@ -162,7 +181,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             1_073_741_824,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(result.batches_scanned, 0);
         assert_eq!(result.bytes_truncated, 0);
@@ -181,7 +201,8 @@ mod tests {
                 TopicName("test".into()),
                 PartitionId(0),
                 1_073_741_824,
-            ).unwrap();
+            )
+            .unwrap();
             cl.append_batch(&make_batch(0, 5)).unwrap();
             cl.append_batch(&make_batch(5, 3)).unwrap();
             cl.flush_all().unwrap();
@@ -193,7 +214,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             1_073_741_824,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(result.batches_scanned, 2);
         assert_eq!(result.bytes_truncated, 0);
@@ -211,7 +233,8 @@ mod tests {
                 TopicName("test".into()),
                 PartitionId(0),
                 1_073_741_824,
-            ).unwrap();
+            )
+            .unwrap();
             cl.append_batch(&make_batch(0, 5)).unwrap();
             cl.flush_all().unwrap();
         }
@@ -229,7 +252,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             1_073_741_824,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(result.batches_scanned, 1);
         assert!(result.bytes_truncated > 0);

@@ -256,49 +256,75 @@ impl fmt::Display for ApiKey {
 // ─── From/Into 转换 ──────────────────────────────────────────────────
 
 impl From<i32> for BrokerId {
-    fn from(v: i32) -> Self { Self(v) }
+    fn from(v: i32) -> Self {
+        Self(v)
+    }
 }
 impl From<BrokerId> for i32 {
-    fn from(v: BrokerId) -> Self { v.0 }
+    fn from(v: BrokerId) -> Self {
+        v.0
+    }
 }
 
 impl From<i32> for PartitionId {
-    fn from(v: i32) -> Self { Self(v) }
+    fn from(v: i32) -> Self {
+        Self(v)
+    }
 }
 impl From<PartitionId> for i32 {
-    fn from(v: PartitionId) -> Self { v.0 }
+    fn from(v: PartitionId) -> Self {
+        v.0
+    }
 }
 
 impl From<i64> for Offset {
-    fn from(v: i64) -> Self { Self(v) }
+    fn from(v: i64) -> Self {
+        Self(v)
+    }
 }
 impl From<Offset> for i64 {
-    fn from(v: Offset) -> Self { v.0 }
+    fn from(v: Offset) -> Self {
+        v.0
+    }
 }
 
 impl From<i32> for Epoch {
-    fn from(v: i32) -> Self { Self(v) }
+    fn from(v: i32) -> Self {
+        Self(v)
+    }
 }
 impl From<Epoch> for i32 {
-    fn from(v: Epoch) -> Self { v.0 }
+    fn from(v: Epoch) -> Self {
+        v.0
+    }
 }
 
 impl From<String> for TopicName {
-    fn from(v: String) -> Self { Self(v) }
+    fn from(v: String) -> Self {
+        Self(v)
+    }
 }
 impl From<&str> for TopicName {
-    fn from(v: &str) -> Self { Self(v.to_string()) }
+    fn from(v: &str) -> Self {
+        Self(v.to_string())
+    }
 }
 
 impl From<String> for GroupId {
-    fn from(v: String) -> Self { Self(v) }
+    fn from(v: String) -> Self {
+        Self(v)
+    }
 }
 impl From<&str> for GroupId {
-    fn from(v: &str) -> Self { Self(v.to_string()) }
+    fn from(v: &str) -> Self {
+        Self(v.to_string())
+    }
 }
 
 impl From<String> for MemberId {
-    fn from(v: String) -> Self { Self(v) }
+    fn from(v: String) -> Self {
+        Self(v)
+    }
 }
 
 // ─── 常量 ────────────────────────────────────────────────────────────
@@ -331,9 +357,13 @@ mod tests {
     #[test]
     fn test_api_key_roundtrip() {
         for key in [
-            ApiKey::Produce, ApiKey::Fetch, ApiKey::Metadata,
-            ApiKey::ApiVersions, ApiKey::SaslHandshake,
-            ApiKey::SaslAuthenticate, ApiKey::Vote,
+            ApiKey::Produce,
+            ApiKey::Fetch,
+            ApiKey::Metadata,
+            ApiKey::ApiVersions,
+            ApiKey::SaslHandshake,
+            ApiKey::SaslAuthenticate,
+            ApiKey::Vote,
         ] {
             let v = key as i16;
             assert_eq!(ApiKey::from_i16(v), Some(key));

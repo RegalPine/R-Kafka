@@ -21,7 +21,7 @@ pub enum FlushMode {
 }
 
 impl FlushMode {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "async" => Self::Async,
             "sync" => Self::Sync,
@@ -111,10 +111,10 @@ mod tests {
 
     #[test]
     fn test_flush_mode_from_str() {
-        assert_eq!(FlushMode::from_str("async"), FlushMode::Async);
-        assert_eq!(FlushMode::from_str("sync"), FlushMode::Sync);
-        assert_eq!(FlushMode::from_str("hybrid"), FlushMode::Hybrid);
-        assert_eq!(FlushMode::from_str("unknown"), FlushMode::Hybrid);
+        assert_eq!(FlushMode::parse("async"), FlushMode::Async);
+        assert_eq!(FlushMode::parse("sync"), FlushMode::Sync);
+        assert_eq!(FlushMode::parse("hybrid"), FlushMode::Hybrid);
+        assert_eq!(FlushMode::parse("unknown"), FlushMode::Hybrid);
     }
 
     #[test]

@@ -15,8 +15,8 @@ use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tracing::{debug, info, warn};
 
-use rk_broker::{BrokerMetrics, MetricsSnapshot};
 use crate::flow_control::FlowController;
+use rk_broker::{BrokerMetrics, MetricsSnapshot};
 
 /// HTTP 监控服务器状态
 pub struct HttpMetricsServer {
@@ -35,7 +35,13 @@ pub struct HttpMetricsServer {
 impl HttpMetricsServer {
     /// 创建 HTTP 监控服务器
     pub fn new(host: String, port: u16, metrics: Arc<BrokerMetrics>, broker_id: i32) -> Self {
-        Self { metrics, port, host, broker_id, flow_controller: None }
+        Self {
+            metrics,
+            port,
+            host,
+            broker_id,
+            flow_controller: None,
+        }
     }
 
     /// 设置流控制器 (用于 /status 端点)
@@ -47,10 +53,7 @@ impl HttpMetricsServer {
     /// 运行 HTTP 服务器
     ///
     /// 接受 HTTP 连接并处理请求，直到收到关闭信号。
-    pub async fn run(
-        &self,
-        mut shutdown_rx: watch::Receiver<bool>,
-    ) -> rk_core::Result<()> {
+    pub async fn run(&self, mut shutdown_rx: watch::Receiver<bool>) -> rk_core::Result<()> {
         let addr = format!("{}:{}", self.host, self.port);
         let listener = TcpListener::bind(&addr).await.map_err(|e| {
             rk_core::RkError::Config(format!("HTTP metrics server bind failed: {e}"))
@@ -106,7 +109,14 @@ async fn handle_http_request(
     // 解析 HTTP 方法和路径
     let parts: Vec<&str> = first_line.split_whitespace().collect();
     if parts.len() < 2 {
-        send_response(&mut stream, 400, "Bad Request", "text/plain", r#"{"error":"bad request"}"#).await?;
+        send_response(
+            &mut stream,
+            400,
+            "Bad Request",
+            "text/plain",
+            r#"{"error":"bad request"}"#,
+        )
+        .await?;
         return Ok(());
     }
 
@@ -114,7 +124,14 @@ async fn handle_http_request(
     let path = parts[1];
 
     if method != "GET" {
-        send_response(&mut stream, 405, "Method Not Allowed", "text/plain", r#"{"error":"method not allowed"}"#).await?;
+        send_response(
+            &mut stream,
+            405,
+            "Method Not Allowed",
+            "text/plain",
+            r#"{"error":"method not allowed"}"#,
+        )
+        .await?;
         return Ok(());
     }
 
@@ -127,7 +144,14 @@ async fn handle_http_request(
         "/metrics/prometheus" => {
             let snapshot = metrics.snapshot();
             let prom = snapshot.to_prometheus(broker_id);
-            send_response(&mut stream, 200, "OK", "text/plain; version=0.0.4; charset=utf-8", &prom).await?;
+            send_response(
+                &mut stream,
+                200,
+                "OK",
+                "text/plain; version=0.0.4; charset=utf-8",
+                &prom,
+            )
+            .await?;
         }
         "/health" => {
             let json = r#"{"status":"ok","service":"r-kafka"}"#;
@@ -153,12 +177,23 @@ async fn handle_http_request(
             };
             let json = format!(
                 r#"{{"status":"ok","service":"r-kafka","broker_id":{},"uptime_secs":{},"total_requests":{},"total_errors":{}{}}}"#,
-                broker_id, snapshot.uptime_secs, snapshot.total_requests, snapshot.total_errors, fc_json,
+                broker_id,
+                snapshot.uptime_secs,
+                snapshot.total_requests,
+                snapshot.total_errors,
+                fc_json,
             );
             send_response(&mut stream, 200, "OK", "application/json", &json).await?;
         }
         _ => {
-            send_response(&mut stream, 404, "Not Found", "text/plain", r#"{"error":"not found"}"#).await?;
+            send_response(
+                &mut stream,
+                404,
+                "Not Found",
+                "text/plain",
+                r#"{"error":"not found"}"#,
+            )
+            .await?;
         }
     }
 
@@ -244,11 +279,16 @@ mod tests {
         let metrics_clone = metrics.clone();
         tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
-            handle_http_request(stream, metrics_clone, 0, None).await.unwrap();
+            handle_http_request(stream, metrics_clone, 0, None)
+                .await
+                .unwrap();
         });
 
         let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-        stream.write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n").await.unwrap();
+        stream
+            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .unwrap();
 
         let mut buf = vec![0u8; 4096];
         let n = stream.read(&mut buf).await.unwrap();
@@ -269,11 +309,16 @@ mod tests {
         let metrics_clone = metrics.clone();
         tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
-            handle_http_request(stream, metrics_clone, 0, None).await.unwrap();
+            handle_http_request(stream, metrics_clone, 0, None)
+                .await
+                .unwrap();
         });
 
         let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-        stream.write_all(b"GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n").await.unwrap();
+        stream
+            .write_all(b"GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .unwrap();
 
         let mut buf = vec![0u8; 4096];
         let n = stream.read(&mut buf).await.unwrap();
@@ -294,11 +339,16 @@ mod tests {
         let metrics_clone = metrics.clone();
         tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
-            handle_http_request(stream, metrics_clone, 1, None).await.unwrap();
+            handle_http_request(stream, metrics_clone, 1, None)
+                .await
+                .unwrap();
         });
 
         let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-        stream.write_all(b"GET /metrics/prometheus HTTP/1.1\r\nHost: localhost\r\n\r\n").await.unwrap();
+        stream
+            .write_all(b"GET /metrics/prometheus HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .unwrap();
 
         let mut buf = vec![0u8; 4096];
         let n = stream.read(&mut buf).await.unwrap();
@@ -318,11 +368,16 @@ mod tests {
         let metrics_clone = metrics.clone();
         tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
-            handle_http_request(stream, metrics_clone, 0, None).await.unwrap();
+            handle_http_request(stream, metrics_clone, 0, None)
+                .await
+                .unwrap();
         });
 
         let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-        stream.write_all(b"GET /unknown HTTP/1.1\r\nHost: localhost\r\n\r\n").await.unwrap();
+        stream
+            .write_all(b"GET /unknown HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .unwrap();
 
         let mut buf = vec![0u8; 4096];
         let n = stream.read(&mut buf).await.unwrap();
@@ -334,9 +389,7 @@ mod tests {
     async fn test_handle_status_request() {
         let metrics = Arc::new(BrokerMetrics::new());
         metrics.record_request(0);
-        let fc = Arc::new(FlowController::new(
-            &BrokerConfig::from_toml("").unwrap(),
-        ));
+        let fc = Arc::new(FlowController::new(&BrokerConfig::from_toml("").unwrap()));
         fc.try_accept_connection().unwrap();
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -346,11 +399,16 @@ mod tests {
         let fc_clone = fc.clone();
         tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
-            handle_http_request(stream, metrics_clone, 5, Some(fc_clone)).await.unwrap();
+            handle_http_request(stream, metrics_clone, 5, Some(fc_clone))
+                .await
+                .unwrap();
         });
 
         let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-        stream.write_all(b"GET /status HTTP/1.1\r\nHost: localhost\r\n\r\n").await.unwrap();
+        stream
+            .write_all(b"GET /status HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .unwrap();
 
         let mut buf = vec![0u8; 4096];
         let n = stream.read(&mut buf).await.unwrap();

@@ -3,10 +3,10 @@
 //! 消费者同步分区分配结果。
 //! Phase 1: 简化实现，Leader 分配后广播。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -45,7 +45,10 @@ impl KafkaRequestDecoder for SyncGroupRequest {
                 let member_id = r.read_compact_string()?;
                 let assignment = r.read_compact_bytes()?;
                 let _tags = r.read_tagged_fields()?;
-                Ok(SyncGroupRequestAssignment { member_id, assignment })
+                Ok(SyncGroupRequestAssignment {
+                    member_id,
+                    assignment,
+                })
             })?;
             let _tags = reader.read_tagged_fields()?;
             Ok(Self {
@@ -80,7 +83,10 @@ impl KafkaRequestDecoder for SyncGroupRequest {
             let assignments = reader.read_array(|r| {
                 let member_id = r.read_string()?;
                 let assignment = r.read_bytes()?;
-                Ok(SyncGroupRequestAssignment { member_id, assignment })
+                Ok(SyncGroupRequestAssignment {
+                    member_id,
+                    assignment,
+                })
             })?;
             Ok(Self {
                 group_id,

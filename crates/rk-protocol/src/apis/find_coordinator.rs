@@ -3,10 +3,10 @@
 //! 客户端通过此 API 查找 Consumer Group Coordinator。
 //! Phase 1: 单 Broker 模式，自身即 Coordinator。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -112,7 +112,7 @@ impl KafkaResponseEncoder for FindCoordinatorResponse {
             } else {
                 // Single coordinator as compact_array with 1 element
                 writer.write_unsigned_varint(2); // length+1 = 2
-                writer.write_compact_string(&""); // key
+                writer.write_compact_string(""); // key
                 writer.write_i32(self.node_id);
                 writer.write_compact_string(&self.host);
                 writer.write_i32(self.port);

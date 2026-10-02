@@ -6,8 +6,8 @@
 //! Response Header v1 (Flexible):
 //!   correlation_id (i32), tagged_fields
 
-use rk_core::error::Result;
 use crate::types::{KafkaReader, KafkaWriter, TaggedField};
+use rk_core::error::Result;
 
 #[derive(Debug, Clone)]
 pub struct ResponseHeader {
@@ -30,7 +30,10 @@ impl ResponseHeader {
         } else {
             Vec::new()
         };
-        Ok(Self { correlation_id, tagged_fields })
+        Ok(Self {
+            correlation_id,
+            tagged_fields,
+        })
     }
 
     pub fn encode(&self, writer: &mut KafkaWriter<'_>, is_flexible: bool) {

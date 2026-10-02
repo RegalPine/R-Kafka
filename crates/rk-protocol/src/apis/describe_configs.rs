@@ -3,10 +3,10 @@
 //! 查询 Broker 或 Topic 配置。
 //! Phase 1: 支持 Topic 和 Broker 资源类型，返回默认/运行时配置。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── 资源类型 ─────────────────────────────────────────────────────────
 
@@ -54,11 +54,16 @@ impl KafkaRequestDecoder for DescribeConfigsRequest {
                 let name = r.read_compact_string()?;
                 let names = if version >= 3 {
                     r.read_compact_array(|r2| r2.read_compact_string())?
-                        .into_iter().collect::<Vec<_>>()
+                        .into_iter()
+                        .collect::<Vec<_>>()
                         .into()
                 } else {
                     let arr = r.read_array(|r2| r2.read_string())?;
-                    if arr.is_empty() { None } else { Some(arr) }
+                    if arr.is_empty() {
+                        None
+                    } else {
+                        Some(arr)
+                    }
                 };
                 Ok(DescribeConfigsRequestResource {
                     resource_type: rt,
@@ -72,7 +77,11 @@ impl KafkaRequestDecoder for DescribeConfigsRequest {
                 let rt = r.read_i8()?;
                 let name = r.read_string()?;
                 let names_opt = r.read_array(|r2| r2.read_string())?;
-                let names = if names_opt.is_empty() { None } else { Some(names_opt) };
+                let names = if names_opt.is_empty() {
+                    None
+                } else {
+                    Some(names_opt)
+                };
                 Ok(DescribeConfigsRequestResource {
                     resource_type: rt,
                     resource_name: name,
@@ -92,7 +101,10 @@ impl KafkaRequestDecoder for DescribeConfigsRequest {
             let _tags = reader.read_tagged_fields()?;
         }
 
-        Ok(Self { resources, include_synonyms })
+        Ok(Self {
+            resources,
+            include_synonyms,
+        })
     }
 }
 

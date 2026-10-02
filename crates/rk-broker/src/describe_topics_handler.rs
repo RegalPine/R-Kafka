@@ -20,7 +20,10 @@ pub struct DescribeTopicsHandler {
 
 impl DescribeTopicsHandler {
     pub fn new(broker_id: i32, partition_manager: Arc<PartitionManager>) -> Self {
-        Self { broker_id, partition_manager }
+        Self {
+            broker_id,
+            partition_manager,
+        }
     }
 
     /// 处理 DescribeTopics 请求
@@ -29,9 +32,10 @@ impl DescribeTopicsHandler {
         request: DescribeTopicsRequest,
         _version: i16,
     ) -> Result<DescribeTopicsResponse> {
-        let topic_names: Option<Vec<&str>> = request.topics.as_ref().map(|topics| {
-            topics.iter().map(|t| t.name.as_str()).collect()
-        });
+        let topic_names: Option<Vec<&str>> = request
+            .topics
+            .as_ref()
+            .map(|topics| topics.iter().map(|t| t.name.as_str()).collect());
 
         debug!(
             has_filter = topic_names.is_some(),
@@ -131,7 +135,10 @@ mod tests {
         };
         let resp = handler.handle(req, 0).unwrap();
         assert_eq!(resp.topics.len(), 1);
-        assert_eq!(resp.topics[0].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            resp.topics[0].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 
     #[test]

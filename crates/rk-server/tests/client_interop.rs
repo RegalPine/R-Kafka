@@ -30,8 +30,8 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use rk_broker::{PartitionManager, BrokerRouter, OffsetManager};
-use rk_protocol::types::{KafkaWriter, KafkaReader};
+use rk_broker::{BrokerRouter, OffsetManager, PartitionManager};
+use rk_protocol::types::{KafkaReader, KafkaWriter};
 use rk_storage::log_io::build_batch_bytes;
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────
@@ -50,7 +50,13 @@ fn build_legacy_frame(body_builder: impl FnOnce(&mut KafkaWriter<'_>)) -> Vec<u8
 }
 
 /// 写入 Legacy RequestHeader
-fn write_legacy_header(w: &mut KafkaWriter<'_>, api_key: i16, api_version: i16, correlation_id: i32, client_id: &str) {
+fn write_legacy_header(
+    w: &mut KafkaWriter<'_>,
+    api_key: i16,
+    api_version: i16,
+    correlation_id: i32,
+    client_id: &str,
+) {
     w.write_i16(api_key);
     w.write_i16(api_version);
     w.write_i32(correlation_id);
@@ -70,13 +76,28 @@ async fn read_response_frame(stream: &mut TcpStream) -> Vec<u8> {
 /// 构建测试 RecordBatch
 fn make_test_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
     let records = vec![0u8; record_count as usize * 10];
-    build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+    build_batch_bytes(
+        base_offset,
+        1,
+        0,
+        1000,
+        2000,
+        -1,
+        -1,
+        -1,
+        &records,
+        record_count,
+    )
 }
 
 /// 启动测试服务器
 async fn setup_server() -> u16 {
     let dir = tempfile::tempdir().unwrap();
-    let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+    let pm = Arc::new(PartitionManager::new(
+        dir.path().to_path_buf(),
+        1_073_741_824,
+        1,
+    ));
     let offset_manager = Arc::new(OffsetManager::new(None));
 
     let router = Arc::new(BrokerRouter::with_offset_manager(
@@ -141,7 +162,9 @@ async fn create_topic(stream: &mut TcpStream, topic: &str, partitions: i32, corr
 #[tokio::test]
 async fn test_sarama_style_produce_fetch() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // ═══ Step 1: ApiVersions v0 (Legacy, sarama 默认) ═══
     let frame = build_legacy_frame(|w| {
@@ -189,7 +212,7 @@ async fn test_sarama_style_produce_fetch() {
         w.write_nullable_string(None); // 非事务
         w.write_i16(1); // acks = 1
         w.write_i32(30_000); // timeout_ms
-        // 批量 produce: 3 partitions
+                             // 批量 produce: 3 partitions
         w.write_i32(1); // 1 topic
         w.write_string("sarama-topic");
         w.write_i32(3); // 3 partitions
@@ -259,7 +282,9 @@ async fn test_sarama_style_produce_fetch() {
 #[tokio::test]
 async fn test_python_style_produce_fetch() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // ═══ Step 1: ApiVersions v0 ═══
     let frame = build_legacy_frame(|w| {
@@ -337,7 +362,7 @@ async fn test_python_style_produce_fetch() {
         w.write_i32(0); // partition
         w.write_i64(0); // fetch_offset
         w.write_i32(1_048_576); // max_bytes
-        // v9+ has forgotten_topics_data, v11+ has rack_id — v4 doesn't
+                                // v9+ has forgotten_topics_data, v11+ has rack_id — v4 doesn't
     });
     stream.write_all(&frame).await.unwrap();
 
@@ -346,9 +371,9 @@ async fn test_python_style_produce_fetch() {
     assert_eq!(reader.read_i32().unwrap(), 5, "Fetch v4 correlation_id");
     // v4 response: throttle_time_ms (v1+)
     let _throttle = reader.read_i32().unwrap();
-    let _error = reader.read_i16().unwrap(); // session_id error (v7+)... 
-    // Actually v4 response format: throttle_time, then topics array
-    // Let's just verify we got a valid response
+    let _error = reader.read_i16().unwrap(); // session_id error (v7+)...
+                                             // Actually v4 response format: throttle_time, then topics array
+                                             // Let's just verify we got a valid response
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -364,14 +389,19 @@ async fn test_mixed_consumer_group() {
 
     // ═══ Go sarama consumer ═══
     {
-        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+            .await
+            .unwrap();
         // ApiVersions v0
         let frame = build_legacy_frame(|w| {
             write_legacy_header(w, 18, 0, 1, "sarama");
         });
         stream.write_all(&frame).await.unwrap();
         let response = read_response_frame(&mut stream).await;
-        assert!(response.len() > 10, "sarama should get ApiVersions response");
+        assert!(
+            response.len() > 10,
+            "sarama should get ApiVersions response"
+        );
 
         // Metadata v0
         let frame = build_legacy_frame(|w| {
@@ -385,14 +415,19 @@ async fn test_mixed_consumer_group() {
 
     // ═══ Python consumer ═══
     {
-        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+            .await
+            .unwrap();
         // ApiVersions v0
         let frame = build_legacy_frame(|w| {
             write_legacy_header(w, 18, 0, 1, "confluent-kafka-python");
         });
         stream.write_all(&frame).await.unwrap();
         let response = read_response_frame(&mut stream).await;
-        assert!(response.len() > 10, "python should get ApiVersions response");
+        assert!(
+            response.len() > 10,
+            "python should get ApiVersions response"
+        );
 
         // Metadata v0
         let frame = build_legacy_frame(|w| {
@@ -406,7 +441,9 @@ async fn test_mixed_consumer_group() {
 
     // ═══ Java consumer ═══
     {
-        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+            .await
+            .unwrap();
         let frame = build_legacy_frame(|w| {
             write_legacy_header(w, 18, 0, 1, "Apache Kafka");
         });
@@ -425,7 +462,9 @@ async fn test_mixed_consumer_group() {
 #[tokio::test]
 async fn test_client_software_identification() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // Go sarama identification (ApiVersions v0 legacy)
     let frame = build_legacy_frame(|w| {
@@ -469,7 +508,9 @@ async fn test_client_software_identification() {
 #[tokio::test]
 async fn test_sarama_batch_multi_topic_produce() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // Create 2 topics
     create_topic(&mut stream, "sarama-batch-a", 2, 1).await;
@@ -482,16 +523,20 @@ async fn test_sarama_batch_multi_topic_produce() {
         w.write_i16(1); // acks = 1
         w.write_i32(30_000); // timeout_ms
         w.write_i32(2); // 2 topics
-        // Topic A
+                        // Topic A
         w.write_string("sarama-batch-a");
         w.write_i32(2); // 2 partitions
-        w.write_i32(0); w.write_bytes(&batch);
-        w.write_i32(1); w.write_bytes(&batch);
+        w.write_i32(0);
+        w.write_bytes(&batch);
+        w.write_i32(1);
+        w.write_bytes(&batch);
         // Topic B
         w.write_string("sarama-batch-b");
         w.write_i32(2); // 2 partitions
-        w.write_i32(0); w.write_bytes(&batch);
-        w.write_i32(1); w.write_bytes(&batch);
+        w.write_i32(0);
+        w.write_bytes(&batch);
+        w.write_i32(1);
+        w.write_bytes(&batch);
     });
     stream.write_all(&frame).await.unwrap();
 
@@ -510,7 +555,9 @@ async fn test_sarama_batch_multi_topic_produce() {
 #[tokio::test]
 async fn test_python_rapid_single_produce() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     create_topic(&mut stream, "python-rapid", 1, 1).await;
 
@@ -544,7 +591,9 @@ async fn test_python_rapid_single_produce() {
 #[tokio::test]
 async fn test_sarama_offset_commit_fetch() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     create_topic(&mut stream, "sarama-offset", 1, 1).await;
 
@@ -604,7 +653,9 @@ async fn test_sarama_offset_commit_fetch() {
 #[tokio::test]
 async fn test_python_list_offsets_by_timestamp() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     create_topic(&mut stream, "python-ts", 1, 1).await;
 
@@ -649,33 +700,46 @@ async fn test_python_list_offsets_by_timestamp() {
 async fn test_concurrent_multi_lang_connections() {
     let port = setup_server().await;
 
-    let handles: Vec<_> = (0..6).map(|i| {
-        let client_id = match i % 3 {
-            0 => "sarama",
-            1 => "confluent-kafka-python",
-            _ => "java-client",
-        }.to_string();
+    let handles: Vec<_> = (0..6)
+        .map(|i| {
+            let client_id = match i % 3 {
+                0 => "sarama",
+                1 => "confluent-kafka-python",
+                _ => "java-client",
+            }
+            .to_string();
 
-        tokio::spawn(async move {
-            let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+            tokio::spawn(async move {
+                let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+                    .await
+                    .unwrap();
 
-            // Each client does: ApiVersions → Metadata
-            let frame = build_legacy_frame(|w| {
-                write_legacy_header(w, 18, 0, 1, &client_id);
-            });
-            stream.write_all(&frame).await.unwrap();
-            let response = read_response_frame(&mut stream).await;
-            assert!(response.len() > 10, "{} should get ApiVersions response", client_id);
+                // Each client does: ApiVersions → Metadata
+                let frame = build_legacy_frame(|w| {
+                    write_legacy_header(w, 18, 0, 1, &client_id);
+                });
+                stream.write_all(&frame).await.unwrap();
+                let response = read_response_frame(&mut stream).await;
+                assert!(
+                    response.len() > 10,
+                    "{} should get ApiVersions response",
+                    client_id
+                );
 
-            let frame = build_legacy_frame(|w| {
-                write_legacy_header(w, 3, 0, 2, &client_id);
-                w.write_i32(-1);
-            });
-            stream.write_all(&frame).await.unwrap();
-            let response = read_response_frame(&mut stream).await;
-            assert!(response.len() > 10, "{} should get Metadata response", client_id);
+                let frame = build_legacy_frame(|w| {
+                    write_legacy_header(w, 3, 0, 2, &client_id);
+                    w.write_i32(-1);
+                });
+                stream.write_all(&frame).await.unwrap();
+                let response = read_response_frame(&mut stream).await;
+                assert!(
+                    response.len() > 10,
+                    "{} should get Metadata response",
+                    client_id
+                );
+            })
         })
-    }).collect();
+        .collect();
 
     for handle in handles {
         handle.await.unwrap();
@@ -689,7 +753,9 @@ async fn test_concurrent_multi_lang_connections() {
 #[tokio::test]
 async fn test_sarama_heartbeat() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // Heartbeat v0 (sarama default)
     let frame = build_legacy_frame(|w| {
@@ -714,7 +780,9 @@ async fn test_sarama_heartbeat() {
 #[tokio::test]
 async fn test_python_leave_group() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // LeaveGroup v0
     let frame = build_legacy_frame(|w| {
@@ -737,7 +805,9 @@ async fn test_python_leave_group() {
 #[tokio::test]
 async fn test_sarama_describe_list_groups() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // ListGroups v0
     let frame = build_legacy_frame(|w| {
@@ -760,7 +830,11 @@ async fn test_sarama_describe_list_groups() {
 
     let response = read_response_frame(&mut stream).await;
     let mut reader = KafkaReader::new(&response);
-    assert_eq!(reader.read_i32().unwrap(), 2, "DescribeGroups correlation_id");
+    assert_eq!(
+        reader.read_i32().unwrap(),
+        2,
+        "DescribeGroups correlation_id"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -770,7 +844,9 @@ async fn test_sarama_describe_list_groups() {
 #[tokio::test]
 async fn test_python_delete_topics() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // Create topic first
     create_topic(&mut stream, "to-delete", 1, 1).await;
@@ -800,7 +876,9 @@ async fn test_multi_lang_sasl_handshake() {
 
     // Go sarama SaslHandshake v0
     {
-        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+            .await
+            .unwrap();
         let frame = build_legacy_frame(|w| {
             write_legacy_header(w, 17, 0, 1, "sarama");
             w.write_string("PLAIN");
@@ -814,7 +892,9 @@ async fn test_multi_lang_sasl_handshake() {
 
     // Python SaslHandshake v1 (flexible - needs compact header)
     {
-        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+            .await
+            .unwrap();
         let frame = build_legacy_frame(|w| {
             w.write_i16(17); // SaslHandshake
             w.write_i16(1); // v1 (flexible)
@@ -839,7 +919,9 @@ async fn test_multi_lang_sasl_handshake() {
 #[tokio::test]
 async fn test_sarama_init_producer_id() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // InitProducerId v0 (sarama 事务模式)
     let frame = build_legacy_frame(|w| {
@@ -851,7 +933,11 @@ async fn test_sarama_init_producer_id() {
 
     let response = read_response_frame(&mut stream).await;
     let mut reader = KafkaReader::new(&response);
-    assert_eq!(reader.read_i32().unwrap(), 1, "InitProducerId correlation_id");
+    assert_eq!(
+        reader.read_i32().unwrap(),
+        1,
+        "InitProducerId correlation_id"
+    );
     // v0 response: throttle_time(i32), error_code(i16), producer_id(i64), producer_epoch(i16)
     let _throttle = reader.read_i32().unwrap();
     let error_code = reader.read_i16().unwrap();

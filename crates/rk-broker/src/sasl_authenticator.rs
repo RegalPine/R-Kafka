@@ -26,7 +26,7 @@ impl SaslMechanism {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_uppercase().as_str() {
             "PLAIN" => Some(SaslMechanism::Plain),
             "SCRAM-SHA-256" => Some(SaslMechanism::ScramSha256),
@@ -53,6 +53,12 @@ pub struct SaslAuthenticator {
     auth_enabled: bool,
 }
 
+impl Default for SaslAuthenticator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SaslAuthenticator {
     /// 创建认证器 (默认支持 PLAIN)
     pub fn new() -> Self {
@@ -69,7 +75,10 @@ impl SaslAuthenticator {
         for (username, password) in &credentials {
             map.insert(username.clone(), password.clone());
         }
-        info!(users = credentials.len(), "SASL authenticator initialized with credentials");
+        info!(
+            users = credentials.len(),
+            "SASL authenticator initialized with credentials"
+        );
         Self {
             supported_mechanisms: vec![SaslMechanism::Plain],
             credentials: map,
@@ -84,12 +93,17 @@ impl SaslAuthenticator {
 
     /// 获取支持的机制列表
     pub fn supported_mechanism_names(&self) -> Vec<String> {
-        self.supported_mechanisms.iter().map(|m| m.as_str().to_string()).collect()
+        self.supported_mechanisms
+            .iter()
+            .map(|m| m.as_str().to_string())
+            .collect()
     }
 
     /// 检查机制是否支持
     pub fn is_mechanism_supported(&self, mechanism: &str) -> bool {
-        self.supported_mechanisms.iter().any(|m| m.as_str().eq_ignore_ascii_case(mechanism))
+        self.supported_mechanisms
+            .iter()
+            .any(|m| m.as_str().eq_ignore_ascii_case(mechanism))
     }
 
     /// 验证 SASL/PLAIN 凭证
@@ -175,10 +189,16 @@ mod tests {
 
     #[test]
     fn test_sasl_mechanism_from_str() {
-        assert_eq!(SaslMechanism::from_str("PLAIN"), Some(SaslMechanism::Plain));
-        assert_eq!(SaslMechanism::from_str("SCRAM-SHA-256"), Some(SaslMechanism::ScramSha256));
-        assert_eq!(SaslMechanism::from_str("SCRAM-SHA-512"), Some(SaslMechanism::ScramSha512));
-        assert_eq!(SaslMechanism::from_str("UNKNOWN"), None);
+        assert_eq!(SaslMechanism::parse("PLAIN"), Some(SaslMechanism::Plain));
+        assert_eq!(
+            SaslMechanism::parse("SCRAM-SHA-256"),
+            Some(SaslMechanism::ScramSha256)
+        );
+        assert_eq!(
+            SaslMechanism::parse("SCRAM-SHA-512"),
+            Some(SaslMechanism::ScramSha512)
+        );
+        assert_eq!(SaslMechanism::parse("UNKNOWN"), None);
     }
 
     #[test]

@@ -3,10 +3,10 @@
 //! 触发 partition leader 选举。
 //! v0: KIP-460, v1: KIP-700 (preferred only + timeout)
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -38,7 +38,11 @@ impl KafkaRequestDecoder for ElectLeadersRequest {
             })?;
             let timeout_ms = reader.read_i32()?;
             let _tags = reader.read_tagged_fields()?;
-            Ok(Self { election_type, topic_partitions, timeout_ms })
+            Ok(Self {
+                election_type,
+                topic_partitions,
+                timeout_ms,
+            })
         } else {
             // Legacy v0-v1
             let election_type = reader.read_i32()?;
@@ -48,7 +52,11 @@ impl KafkaRequestDecoder for ElectLeadersRequest {
                 Ok(ElectLeadersRequestTopic { topic, partitions })
             })?;
             let timeout_ms = reader.read_i32()?;
-            Ok(Self { election_type, topic_partitions, timeout_ms })
+            Ok(Self {
+                election_type,
+                topic_partitions,
+                timeout_ms,
+            })
         }
     }
 }

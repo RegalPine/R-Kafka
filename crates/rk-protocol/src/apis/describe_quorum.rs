@@ -4,10 +4,10 @@
 //! KIP-595, v0-v1 为 Flexible 格式。
 //! Phase 1: 单 Broker，返回当前 Broker 作为唯一 leader 的信息。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -38,7 +38,10 @@ impl KafkaRequestDecoder for DescribeQuorumRequest {
                 Ok(DescribeQuorumRequestPartition { partition_index })
             })?;
             let _tags = r.read_tagged_fields();
-            Ok(DescribeQuorumRequestTopic { topic_name, partitions })
+            Ok(DescribeQuorumRequestTopic {
+                topic_name,
+                partitions,
+            })
         })?;
         Ok(Self { topics })
     }

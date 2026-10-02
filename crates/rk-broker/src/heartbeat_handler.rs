@@ -22,11 +22,7 @@ impl HeartbeatHandler {
     }
 
     /// 处理 Heartbeat 请求
-    pub fn handle(
-        &self,
-        request: HeartbeatRequest,
-        _version: i16,
-    ) -> Result<HeartbeatResponse> {
+    pub fn handle(&self, request: HeartbeatRequest, _version: i16) -> Result<HeartbeatResponse> {
         debug!(
             group_id = %request.group_id,
             member_id = %request.member_id,
@@ -62,9 +58,9 @@ mod tests {
     fn test_heartbeat_handler() {
         let gm = Arc::new(GroupManager::new());
 
-        let (gen, mid, _leader, _proto, _members) = gm.join_group(
-            "test-group", "", None, "consumer", vec![],
-        ).unwrap();
+        let (gen, mid, _leader, _proto, _members) = gm
+            .join_group("test-group", "", None, "consumer", vec![])
+            .unwrap();
 
         let handler = HeartbeatHandler::new(gm);
 
@@ -83,7 +79,8 @@ mod tests {
     fn test_heartbeat_handler_unknown_member() {
         let gm = Arc::new(GroupManager::new());
 
-        gm.join_group("test-group", "", None, "consumer", vec![]).unwrap();
+        gm.join_group("test-group", "", None, "consumer", vec![])
+            .unwrap();
 
         let handler = HeartbeatHandler::new(gm);
 

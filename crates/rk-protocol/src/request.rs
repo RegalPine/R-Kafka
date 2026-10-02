@@ -7,8 +7,8 @@
 //!   api_key (i16), api_version (i16), correlation_id (i32), client_id (compact_nullable_string),
 //!   tagged_fields
 
-use rk_core::error::Result;
 use crate::types::{KafkaReader, KafkaWriter, TaggedField};
+use rk_core::error::Result;
 
 #[derive(Debug, Clone)]
 pub struct RequestHeader {
@@ -21,7 +21,12 @@ pub struct RequestHeader {
 }
 
 impl RequestHeader {
-    pub fn new(api_key: i16, api_version: i16, correlation_id: i32, client_id: Option<String>) -> Self {
+    pub fn new(
+        api_key: i16,
+        api_version: i16,
+        correlation_id: i32,
+        client_id: Option<String>,
+    ) -> Self {
         Self {
             api_key,
             api_version,

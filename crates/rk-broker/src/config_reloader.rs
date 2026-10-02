@@ -23,7 +23,10 @@ pub struct ConfigReloader {
 impl ConfigReloader {
     /// 创建配置热加载器
     pub fn new(config_path: PathBuf, shared_config: Arc<RwLock<BrokerConfig>>) -> Self {
-        Self { config_path, shared_config }
+        Self {
+            config_path,
+            shared_config,
+        }
     }
 
     /// 从文件重新加载配置
@@ -33,17 +36,16 @@ impl ConfigReloader {
     pub fn reload(&self) -> Result<ConfigReloadReport> {
         info!(path = %self.config_path.display(), "Reloading configuration from file");
 
-        let new_config = BrokerConfig::from_file(
-            &self.config_path.to_string_lossy(),
-        )?;
+        let new_config = BrokerConfig::from_file(&self.config_path.to_string_lossy())?;
 
         let mut report = ConfigReloadReport::default();
 
         // 读取当前配置进行比较
         let (immutable_id, immutable_port, immutable_data_dir) = {
-            let current = self.shared_config.read().map_err(|e| {
-                rk_core::RkError::Config(format!("Config lock poisoned: {e}"))
-            })?;
+            let current = self
+                .shared_config
+                .read()
+                .map_err(|e| rk_core::RkError::Config(format!("Config lock poisoned: {e}")))?;
 
             // 检查不可变字段变更
             if new_config.broker.id != current.broker.id {
@@ -68,7 +70,9 @@ impl ConfigReloader {
                     new = %new_config.storage.data_dir,
                     "storage.data_dir changed but is immutable at runtime, ignoring"
                 );
-                report.immutable_changes.push("storage.data_dir".to_string());
+                report
+                    .immutable_changes
+                    .push("storage.data_dir".to_string());
             }
 
             // 热加载 retention 配置
@@ -78,7 +82,9 @@ impl ConfigReloader {
                     new = new_config.retention.max_bytes,
                     "retention.max_bytes updated"
                 );
-                report.updated_fields.push("retention.max_bytes".to_string());
+                report
+                    .updated_fields
+                    .push("retention.max_bytes".to_string());
             }
             if new_config.retention.max_ms != current.retention.max_ms {
                 info!(
@@ -94,7 +100,9 @@ impl ConfigReloader {
                     new = new_config.retention.compaction_enabled,
                     "retention.compaction_enabled updated"
                 );
-                report.updated_fields.push("retention.compaction_enabled".to_string());
+                report
+                    .updated_fields
+                    .push("retention.compaction_enabled".to_string());
             }
 
             // 热加载 network 配置
@@ -104,7 +112,9 @@ impl ConfigReloader {
                     new = new_config.network.max_connections,
                     "network.max_connections updated"
                 );
-                report.updated_fields.push("network.max_connections".to_string());
+                report
+                    .updated_fields
+                    .push("network.max_connections".to_string());
             }
             if new_config.network.max_request_size != current.network.max_request_size {
                 info!(
@@ -112,7 +122,9 @@ impl ConfigReloader {
                     new = new_config.network.max_request_size,
                     "network.max_request_size updated"
                 );
-                report.updated_fields.push("network.max_request_size".to_string());
+                report
+                    .updated_fields
+                    .push("network.max_request_size".to_string());
             }
             if new_config.network.max_pending_bytes != current.network.max_pending_bytes {
                 info!(
@@ -120,7 +132,9 @@ impl ConfigReloader {
                     new = new_config.network.max_pending_bytes,
                     "network.max_pending_bytes updated"
                 );
-                report.updated_fields.push("network.max_pending_bytes".to_string());
+                report
+                    .updated_fields
+                    .push("network.max_pending_bytes".to_string());
             }
 
             // 热加载 storage flush 配置
@@ -130,7 +144,9 @@ impl ConfigReloader {
                     new = new_config.storage.flush_interval_ms,
                     "storage.flush_interval_ms updated"
                 );
-                report.updated_fields.push("storage.flush_interval_ms".to_string());
+                report
+                    .updated_fields
+                    .push("storage.flush_interval_ms".to_string());
             }
 
             // 热加载 observability 配置
@@ -140,11 +156,17 @@ impl ConfigReloader {
                     new = new_config.observability.metrics_enabled,
                     "observability.metrics_enabled updated"
                 );
-                report.updated_fields.push("observability.metrics_enabled".to_string());
+                report
+                    .updated_fields
+                    .push("observability.metrics_enabled".to_string());
             }
 
             // 保存不可变字段
-            (current.broker.id, current.broker.port, current.storage.data_dir.clone())
+            (
+                current.broker.id,
+                current.broker.port,
+                current.storage.data_dir.clone(),
+            )
         }; // read guard 在此 drop
 
         // 应用新配置 (保留不可变字段)
@@ -155,9 +177,10 @@ impl ConfigReloader {
 
         // 写入新配置
         {
-            let mut current = self.shared_config.write().map_err(|e| {
-                rk_core::RkError::Config(format!("Config lock poisoned: {e}"))
-            })?;
+            let mut current = self
+                .shared_config
+                .write()
+                .map_err(|e| rk_core::RkError::Config(format!("Config lock poisoned: {e}")))?;
             *current = updated_config;
         }
 
@@ -223,8 +246,12 @@ mod tests {
         // 热加载
         let report = reloader.reload().unwrap();
         assert!(report.success);
-        assert!(report.updated_fields.contains(&"retention.max_bytes".to_string()));
-        assert!(report.updated_fields.contains(&"retention.max_ms".to_string()));
+        assert!(report
+            .updated_fields
+            .contains(&"retention.max_bytes".to_string()));
+        assert!(report
+            .updated_fields
+            .contains(&"retention.max_ms".to_string()));
         assert!(report.immutable_changes.is_empty());
 
         // 验证配置已更新
@@ -260,7 +287,9 @@ mod tests {
         let report = reloader.reload().unwrap();
         assert!(report.success);
         assert!(report.immutable_changes.contains(&"broker.id".to_string()));
-        assert!(report.immutable_changes.contains(&"broker.port".to_string()));
+        assert!(report
+            .immutable_changes
+            .contains(&"broker.port".to_string()));
 
         // 不可变字段保持不变
         let current = shared.read().unwrap();

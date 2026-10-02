@@ -60,13 +60,15 @@ impl BrokerConnection {
 
     /// 建立 TCP 连接
     pub async fn connect(&self) -> ClientResult<()> {
-        let stream = tokio::time::timeout(
-            self.connection_timeout,
-            TcpStream::connect(&self.address),
-        )
-        .await
-        .map_err(|_| ClientError::Timeout(format!("Connect to {} timed out", self.address)))?
-        .map_err(|e| ClientError::Connection(format!("Failed to connect to {}: {}", self.address, e)))?;
+        let stream =
+            tokio::time::timeout(self.connection_timeout, TcpStream::connect(&self.address))
+                .await
+                .map_err(|_| {
+                    ClientError::Timeout(format!("Connect to {} timed out", self.address))
+                })?
+                .map_err(|e| {
+                    ClientError::Connection(format!("Failed to connect to {}: {}", self.address, e))
+                })?;
 
         stream.set_nodelay(true).ok();
 
@@ -99,9 +101,9 @@ impl BrokerConnection {
     /// 发送原始请求帧并接收响应
     pub async fn send_and_receive(&self, request_bytes: &[u8]) -> ClientResult<Vec<u8>> {
         let mut guard = self.stream.lock().await;
-        let stream = guard.as_mut().ok_or_else(|| {
-            ClientError::Connection("Not connected".to_string())
-        })?;
+        let stream = guard
+            .as_mut()
+            .ok_or_else(|| ClientError::Connection("Not connected".to_string()))?;
 
         // 发送: 4 字节长度前缀 + 请求体
         let len = request_bytes.len() as u32;

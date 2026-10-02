@@ -1,0 +1,43 @@
+{{- if and .Values.security.tls.enabled (not .Values.security.tls.existingSecret) }}
+# ─────────────────────────────────────────────────────────────
+# cert-manager Certificate — 自动 TLS 证书签发与轮换
+# 需要集群已安装 cert-manager (https://cert-manager.io)
+# ─────────────────────────────────────────────────────────────
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "r-kafka.fullname" . }}-tls
+  labels:
+    {{- include "r-kafka.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "r-kafka.fullname" . }}-tls
+  duration: 2160h   # 90 天
+  renewBefore: 360h # 提前 15 天续签
+  subject:
+    organizations:
+      - r-kafka
+  commonName: r-kafka
+  isCA: false
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  usages:
+    - server auth
+    - client auth
+  dnsNames:
+    # 客户端 Service DNS
+    - {{ include "r-kafka.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+    - {{ include "r-kafka.fullname" . }}.{{ .Release.Namespace }}.svc
+    # Headless Service (Pod 间通信)
+    - {{ include "r-kafka.headlessName" . }}.{{ .Release.Namespace }}.svc.cluster.local
+    - {{ include "r-kafka.headlessName" . }}.{{ .Release.Namespace }}.svc
+    # 各 Pod DNS (StatefulSet)
+    {{- range $i := until (int .Values.replicaCount) }}
+    - {{ include "r-kafka.fullname" $ }}-{{ $i }}.{{ include "r-kafka.headlessName" $ }}.{{ $.Release.Namespace }}.svc.cluster.local
+    {{- end }}
+    # 通配符 (便于扩展)
+    - "*.{{ include "r-kafka.headlessName" . }}.{{ .Release.Namespace }}.svc.cluster.local"
+  issuerRef:
+    name: {{ .Values.security.tls.issuerName | default "ca-issuer" }}
+    kind: {{ .Values.security.tls.issuerKind | default "ClusterIssuer" }}
+{{- end }}

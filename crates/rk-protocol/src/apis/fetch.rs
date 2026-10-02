@@ -2,10 +2,10 @@
 //!
 //! 实现 FetchRequest / FetchResponse，支持 v0-v16。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ─────────────────────────────────────────────────────────
 
@@ -68,38 +68,26 @@ impl KafkaRequestDecoder for FetchRequest {
             0 // READ_UNCOMMITTED
         };
 
-        let session_id = if version >= 7 {
-            reader.read_i32()?
-        } else {
-            0
-        };
+        let session_id = if version >= 7 { reader.read_i32()? } else { 0 };
 
-        let session_epoch = if version >= 7 {
-            reader.read_i32()?
-        } else {
-            0
-        };
+        let session_epoch = if version >= 7 { reader.read_i32()? } else { 0 };
 
         let topics = if is_flex {
             reader.read_compact_array(|r| {
                 let name = r.read_compact_string()?;
                 let partitions = r.read_compact_array(|r| {
                     let index = r.read_i32()?;
-                    let current_leader_epoch = if version >= 9 {
-                        r.read_i32()?
-                    } else {
-                        -1
-                    };
+                    let current_leader_epoch = if version >= 9 { r.read_i32()? } else { -1 };
                     let fetch_offset = r.read_i64()?;
-                    let log_start_offset = if version >= 5 {
-                        r.read_i64()?
-                    } else {
-                        -1
-                    };
+                    let log_start_offset = if version >= 5 { r.read_i64()? } else { -1 };
                     let max_bytes = r.read_i32()?;
                     let _ = r.read_tagged_fields();
                     Ok(FetchRequestPartition {
-                        index, current_leader_epoch, fetch_offset, log_start_offset, max_bytes,
+                        index,
+                        current_leader_epoch,
+                        fetch_offset,
+                        log_start_offset,
+                        max_bytes,
                     })
                 })?;
                 let _ = r.read_tagged_fields();
@@ -110,20 +98,16 @@ impl KafkaRequestDecoder for FetchRequest {
                 let name = r.read_string()?;
                 let partitions = r.read_array(|r| {
                     let index = r.read_i32()?;
-                    let current_leader_epoch = if version >= 9 {
-                        r.read_i32()?
-                    } else {
-                        -1
-                    };
+                    let current_leader_epoch = if version >= 9 { r.read_i32()? } else { -1 };
                     let fetch_offset = r.read_i64()?;
-                    let log_start_offset = if version >= 5 {
-                        r.read_i64()?
-                    } else {
-                        -1
-                    };
+                    let log_start_offset = if version >= 5 { r.read_i64()? } else { -1 };
                     let max_bytes = r.read_i32()?;
                     Ok(FetchRequestPartition {
-                        index, current_leader_epoch, fetch_offset, log_start_offset, max_bytes,
+                        index,
+                        current_leader_epoch,
+                        fetch_offset,
+                        log_start_offset,
+                        max_bytes,
                     })
                 })?;
                 Ok(FetchRequestTopic { name, partitions })
@@ -160,9 +144,15 @@ impl KafkaRequestDecoder for FetchRequest {
         }
 
         Ok(Self {
-            replica_id, max_wait_ms, min_bytes, max_bytes,
-            isolation_level, session_id, session_epoch,
-            topics, rack_id,
+            replica_id,
+            max_wait_ms,
+            min_bytes,
+            max_bytes,
+            isolation_level,
+            session_id,
+            session_epoch,
+            topics,
+            rack_id,
         })
     }
 }
@@ -226,7 +216,11 @@ impl KafkaResponseEncoder for FetchResponse {
                     if version >= 4 {
                         w.write_compact_array(&[] as &[i32], |_, _| {});
                     }
-                    w.write_nullable_bytes(if p.record_set.is_empty() { None } else { Some(&p.record_set) });
+                    w.write_nullable_bytes(if p.record_set.is_empty() {
+                        None
+                    } else {
+                        Some(&p.record_set)
+                    });
                     w.write_tagged_fields(&[]);
                 });
                 w.write_tagged_fields(&[]);
@@ -248,7 +242,11 @@ impl KafkaResponseEncoder for FetchResponse {
                         // aborted_transactions — empty array
                         w.write_array(&[] as &[i32], |_, _| {});
                     }
-                    w.write_nullable_bytes(if p.record_set.is_empty() { None } else { Some(&p.record_set) });
+                    w.write_nullable_bytes(if p.record_set.is_empty() {
+                        None
+                    } else {
+                        Some(&p.record_set)
+                    });
                 });
             });
         }

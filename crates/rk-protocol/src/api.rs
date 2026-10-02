@@ -2,7 +2,7 @@
 //!
 //! 根据 Request Header 中的 api_key 分发到对应 Handler。
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -37,9 +37,10 @@ impl ApiRouter {
     }
 
     pub fn route(&self, ctx: RequestContext, body: &[u8]) -> Result<Vec<u8>> {
-        let handler = self.handlers.get(&ctx.api_key).ok_or_else(|| {
-            RkError::UnsupportedApiKey(ctx.api_key)
-        })?;
+        let handler = self
+            .handlers
+            .get(&ctx.api_key)
+            .ok_or(RkError::UnsupportedApiKey(ctx.api_key))?;
         handler.handle(ctx, body)
     }
 

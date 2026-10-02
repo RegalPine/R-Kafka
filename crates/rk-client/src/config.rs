@@ -117,14 +117,10 @@ impl ClientConfig {
             ));
         }
         if self.client_id.is_empty() {
-            return Err(ClientError::Config(
-                "client_id cannot be empty".to_string(),
-            ));
+            return Err(ClientError::Config("client_id cannot be empty".to_string()));
         }
         if self.acks != 0 && self.acks != 1 && self.acks != -1 {
-            return Err(ClientError::Config(
-                "acks must be 0, 1, or -1".to_string(),
-            ));
+            return Err(ClientError::Config("acks must be 0, 1, or -1".to_string()));
         }
         Ok(self)
     }
@@ -238,9 +234,7 @@ mod tests {
 
     #[test]
     fn test_empty_bootstrap_fails() {
-        let result = ClientConfig::new()
-            .bootstrap_servers("")
-            .build();
+        let result = ClientConfig::new().bootstrap_servers("").build();
         assert!(result.is_err());
     }
 

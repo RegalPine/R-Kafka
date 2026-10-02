@@ -56,7 +56,10 @@ impl FlowController {
 
     /// 增加待处理字节数
     pub fn add_pending_bytes(&self, bytes: usize) -> rk_core::Result<()> {
-        let current = self.current_pending_bytes.fetch_add(bytes, Ordering::Relaxed) + bytes;
+        let current = self
+            .current_pending_bytes
+            .fetch_add(bytes, Ordering::Relaxed)
+            + bytes;
         if current > self.max_pending_bytes {
             return Err(rk_core::RkError::BackpressureExceeded {
                 current,
@@ -68,7 +71,8 @@ impl FlowController {
 
     /// 减少待处理字节数
     pub fn release_pending_bytes(&self, bytes: usize) {
-        self.current_pending_bytes.fetch_sub(bytes, Ordering::Relaxed);
+        self.current_pending_bytes
+            .fetch_sub(bytes, Ordering::Relaxed);
     }
 
     /// 获取当前活跃连接数

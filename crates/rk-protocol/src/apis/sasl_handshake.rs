@@ -3,10 +3,10 @@
 //! SASL 握手: 客户端请求认证机制列表。
 //! v0: legacy, v1: flexible (KIP-482)
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -131,9 +131,7 @@ mod tests {
 
     #[test]
     fn test_sasl_handshake_response_v1_encode() {
-        let resp = SaslHandshakeResponse::supported(vec![
-            "PLAIN".to_string(),
-        ]);
+        let resp = SaslHandshakeResponse::supported(vec!["PLAIN".to_string()]);
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
         resp.encode(&mut w, 1).unwrap();

@@ -3,10 +3,10 @@
 //! 客户端通过此 API 发现 Broker 支持的 API 版本范围。
 //! 这是客户端连接后发送的第一个请求。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 /// R-Kafka 支持的 API 版本范围
 #[derive(Debug, Clone)]
@@ -22,83 +22,239 @@ pub struct ApiVersion {
 /// Broker-control APIs (4-7) 和 KRaft APIs (51-56) 暂未实现，不在此列表中。
 pub const SUPPORTED_API_VERSIONS: &[ApiVersion] = &[
     // Produce (0)
-    ApiVersion { api_key: 0,  min_version: 0, max_version: 10 },
+    ApiVersion {
+        api_key: 0,
+        min_version: 0,
+        max_version: 10,
+    },
     // Fetch (1)
-    ApiVersion { api_key: 1,  min_version: 0, max_version: 16 },
+    ApiVersion {
+        api_key: 1,
+        min_version: 0,
+        max_version: 16,
+    },
     // ListOffsets (2)
-    ApiVersion { api_key: 2,  min_version: 0, max_version: 8  },
+    ApiVersion {
+        api_key: 2,
+        min_version: 0,
+        max_version: 8,
+    },
     // Metadata (3)
-    ApiVersion { api_key: 3,  min_version: 0, max_version: 13 },
+    ApiVersion {
+        api_key: 3,
+        min_version: 0,
+        max_version: 13,
+    },
     // OffsetCommit (8)
-    ApiVersion { api_key: 8,  min_version: 0, max_version: 9  },
+    ApiVersion {
+        api_key: 8,
+        min_version: 0,
+        max_version: 9,
+    },
     // OffsetFetch (9)
-    ApiVersion { api_key: 9,  min_version: 0, max_version: 9  },
+    ApiVersion {
+        api_key: 9,
+        min_version: 0,
+        max_version: 9,
+    },
     // FindCoordinator (10)
-    ApiVersion { api_key: 10, min_version: 0, max_version: 4  },
+    ApiVersion {
+        api_key: 10,
+        min_version: 0,
+        max_version: 4,
+    },
     // JoinGroup (11)
-    ApiVersion { api_key: 11, min_version: 0, max_version: 9  },
+    ApiVersion {
+        api_key: 11,
+        min_version: 0,
+        max_version: 9,
+    },
     // Heartbeat (12)
-    ApiVersion { api_key: 12, min_version: 0, max_version: 4  },
+    ApiVersion {
+        api_key: 12,
+        min_version: 0,
+        max_version: 4,
+    },
     // LeaveGroup (13)
-    ApiVersion { api_key: 13, min_version: 0, max_version: 5  },
+    ApiVersion {
+        api_key: 13,
+        min_version: 0,
+        max_version: 5,
+    },
     // SyncGroup (14)
-    ApiVersion { api_key: 14, min_version: 0, max_version: 5  },
+    ApiVersion {
+        api_key: 14,
+        min_version: 0,
+        max_version: 5,
+    },
     // DescribeGroups (15)
-    ApiVersion { api_key: 15, min_version: 0, max_version: 5  },
+    ApiVersion {
+        api_key: 15,
+        min_version: 0,
+        max_version: 5,
+    },
     // ListGroups (16)
-    ApiVersion { api_key: 16, min_version: 0, max_version: 4  },
+    ApiVersion {
+        api_key: 16,
+        min_version: 0,
+        max_version: 4,
+    },
     // SaslHandshake (17)
-    ApiVersion { api_key: 17, min_version: 0, max_version: 1  },
+    ApiVersion {
+        api_key: 17,
+        min_version: 0,
+        max_version: 1,
+    },
     // ApiVersions (18)
-    ApiVersion { api_key: 18, min_version: 0, max_version: 3  },
+    ApiVersion {
+        api_key: 18,
+        min_version: 0,
+        max_version: 3,
+    },
     // CreateTopics (19)
-    ApiVersion { api_key: 19, min_version: 0, max_version: 3  },
+    ApiVersion {
+        api_key: 19,
+        min_version: 0,
+        max_version: 3,
+    },
     // DeleteTopics (20)
-    ApiVersion { api_key: 20, min_version: 0, max_version: 6  },
+    ApiVersion {
+        api_key: 20,
+        min_version: 0,
+        max_version: 6,
+    },
     // DeleteRecords (21)
-    ApiVersion { api_key: 21, min_version: 0, max_version: 3  },
+    ApiVersion {
+        api_key: 21,
+        min_version: 0,
+        max_version: 3,
+    },
     // InitProducerId (22)
-    ApiVersion { api_key: 22, min_version: 0, max_version: 4  },
+    ApiVersion {
+        api_key: 22,
+        min_version: 0,
+        max_version: 4,
+    },
     // OffsetForLeaderEpoch (23)
-    ApiVersion { api_key: 23, min_version: 0, max_version: 4  },
+    ApiVersion {
+        api_key: 23,
+        min_version: 0,
+        max_version: 4,
+    },
     // AddPartitionsToTxn (24)
-    ApiVersion { api_key: 24, min_version: 0, max_version: 3  },
+    ApiVersion {
+        api_key: 24,
+        min_version: 0,
+        max_version: 3,
+    },
     // EndTxn (26)
-    ApiVersion { api_key: 26, min_version: 0, max_version: 3  },
+    ApiVersion {
+        api_key: 26,
+        min_version: 0,
+        max_version: 3,
+    },
     // DescribeConfigs (32)
-    ApiVersion { api_key: 32, min_version: 0, max_version: 4  },
+    ApiVersion {
+        api_key: 32,
+        min_version: 0,
+        max_version: 4,
+    },
     // AlterConfigs (33)
-    ApiVersion { api_key: 33, min_version: 0, max_version: 2  },
+    ApiVersion {
+        api_key: 33,
+        min_version: 0,
+        max_version: 2,
+    },
     // SaslAuthenticate (36)
-    ApiVersion { api_key: 36, min_version: 0, max_version: 2  },
+    ApiVersion {
+        api_key: 36,
+        min_version: 0,
+        max_version: 2,
+    },
     // CreatePartitions (37)
-    ApiVersion { api_key: 37, min_version: 0, max_version: 3  },
+    ApiVersion {
+        api_key: 37,
+        min_version: 0,
+        max_version: 3,
+    },
     // ElectLeaders (43)
-    ApiVersion { api_key: 43, min_version: 0, max_version: 2  },
+    ApiVersion {
+        api_key: 43,
+        min_version: 0,
+        max_version: 2,
+    },
     // IncrementalAlterConfigs (44)
-    ApiVersion { api_key: 44, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 44,
+        min_version: 0,
+        max_version: 0,
+    },
     // AlterPartitionReassignments (45)
-    ApiVersion { api_key: 45, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 45,
+        min_version: 0,
+        max_version: 0,
+    },
     // ListPartitionReassignments (46)
-    ApiVersion { api_key: 46, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 46,
+        min_version: 0,
+        max_version: 0,
+    },
     // OffsetDelete (47)
-    ApiVersion { api_key: 47, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 47,
+        min_version: 0,
+        max_version: 0,
+    },
     // Vote (51)
-    ApiVersion { api_key: 51, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 51,
+        min_version: 0,
+        max_version: 0,
+    },
     // BeginQuorumEpoch (52)
-    ApiVersion { api_key: 52, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 52,
+        min_version: 0,
+        max_version: 0,
+    },
     // EndQuorumEpoch (53)
-    ApiVersion { api_key: 53, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 53,
+        min_version: 0,
+        max_version: 0,
+    },
     // DescribeQuorum (56)
-    ApiVersion { api_key: 56, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 56,
+        min_version: 0,
+        max_version: 0,
+    },
     // DescribeCluster (60)
-    ApiVersion { api_key: 60, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 60,
+        min_version: 0,
+        max_version: 0,
+    },
     // DescribeProducers (61)
-    ApiVersion { api_key: 61, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 61,
+        min_version: 0,
+        max_version: 0,
+    },
     // ListTransactions (65)
-    ApiVersion { api_key: 65, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 65,
+        min_version: 0,
+        max_version: 0,
+    },
     // DescribeTopics (70)
-    ApiVersion { api_key: 70, min_version: 0, max_version: 0  },
+    ApiVersion {
+        api_key: 70,
+        min_version: 0,
+        max_version: 0,
+    },
 ];
 
 // ─── ApiVersions Request ─────────────────────────────────────────────

@@ -4,12 +4,11 @@
 //! - Tracing: 结构化日志 + OpenTelemetry 集成
 //! - Metrics: Prometheus 指标导出
 
-pub mod tracing_setup;
 pub mod metrics;
+pub mod tracing_setup;
 
 // Re-exports
+pub use metrics::{shared_metrics, PrometheusMetrics, SharedPrometheusMetrics};
 pub use tracing_setup::{
-    TracingConfig, TracingLayer, TracingGuard,
-    init_tracing, init_tracing_with_config,
+    init_tracing, init_tracing_with_config, TracingConfig, TracingGuard, TracingLayer,
 };
-pub use metrics::{PrometheusMetrics, SharedPrometheusMetrics, shared_metrics};

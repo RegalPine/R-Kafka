@@ -31,8 +31,8 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use rk_broker::{PartitionManager, BrokerRouter, OffsetManager};
-use rk_protocol::types::{KafkaWriter, KafkaReader};
+use rk_broker::{BrokerRouter, OffsetManager, PartitionManager};
+use rk_protocol::types::{KafkaReader, KafkaWriter};
 use rk_storage::log_io::build_batch_bytes;
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────
@@ -48,7 +48,13 @@ fn build_legacy_frame(body_builder: impl FnOnce(&mut KafkaWriter<'_>)) -> Vec<u8
     frame.to_vec()
 }
 
-fn write_legacy_header(w: &mut KafkaWriter<'_>, api_key: i16, api_version: i16, correlation_id: i32, client_id: &str) {
+fn write_legacy_header(
+    w: &mut KafkaWriter<'_>,
+    api_key: i16,
+    api_version: i16,
+    correlation_id: i32,
+    client_id: &str,
+) {
     w.write_i16(api_key);
     w.write_i16(api_version);
     w.write_i32(correlation_id);
@@ -66,12 +72,27 @@ async fn read_response_frame(stream: &mut TcpStream) -> Vec<u8> {
 
 fn make_test_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
     let records = vec![0u8; record_count as usize * 10];
-    build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+    build_batch_bytes(
+        base_offset,
+        1,
+        0,
+        1000,
+        2000,
+        -1,
+        -1,
+        -1,
+        &records,
+        record_count,
+    )
 }
 
 async fn setup_server() -> u16 {
     let dir = tempfile::tempdir().unwrap();
-    let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+    let pm = Arc::new(PartitionManager::new(
+        dir.path().to_path_buf(),
+        1_073_741_824,
+        1,
+    ));
     let offset_manager = Arc::new(OffsetManager::new(None));
 
     let router = Arc::new(BrokerRouter::with_offset_manager(
@@ -107,7 +128,9 @@ async fn setup_server() -> u16 {
 }
 
 async fn connect(port: u16) -> TcpStream {
-    TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap()
+    TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .unwrap()
 }
 
 async fn create_topic(stream: &mut TcpStream, topic: &str, partitions: i32) {
@@ -189,46 +212,286 @@ struct ApiMatrixEntry {
 /// 完整的 R-Kafka 兼容性矩阵
 fn compatibility_matrix() -> Vec<ApiMatrixEntry> {
     vec![
-        ApiMatrixEntry { api_key: 0,  name: "Produce",                     r_kafka_min: 0, r_kafka_max: 10, flexible_start: Some(9) },
-        ApiMatrixEntry { api_key: 1,  name: "Fetch",                       r_kafka_min: 0, r_kafka_max: 16, flexible_start: Some(12) },
-        ApiMatrixEntry { api_key: 2,  name: "ListOffsets",                 r_kafka_min: 0, r_kafka_max: 8,  flexible_start: Some(7) },
-        ApiMatrixEntry { api_key: 3,  name: "Metadata",                    r_kafka_min: 0, r_kafka_max: 13, flexible_start: Some(9) },
-        ApiMatrixEntry { api_key: 4,  name: "LeaderAndIsr",                r_kafka_min: 0, r_kafka_max: 6,  flexible_start: None },
-        ApiMatrixEntry { api_key: 5,  name: "StopReplica",                 r_kafka_min: 0, r_kafka_max: 3,  flexible_start: None },
-        ApiMatrixEntry { api_key: 6,  name: "UpdateMetadata",              r_kafka_min: 0, r_kafka_max: 9,  flexible_start: None },
-        ApiMatrixEntry { api_key: 7,  name: "ControlledShutdown",          r_kafka_min: 0, r_kafka_max: 3,  flexible_start: None },
-        ApiMatrixEntry { api_key: 8,  name: "OffsetCommit",                r_kafka_min: 0, r_kafka_max: 9,  flexible_start: Some(8) },
-        ApiMatrixEntry { api_key: 9,  name: "OffsetFetch",                 r_kafka_min: 0, r_kafka_max: 9,  flexible_start: Some(8) },
-        ApiMatrixEntry { api_key: 10, name: "FindCoordinator",             r_kafka_min: 0, r_kafka_max: 4,  flexible_start: Some(4) },
-        ApiMatrixEntry { api_key: 11, name: "JoinGroup",                   r_kafka_min: 0, r_kafka_max: 9,  flexible_start: Some(6) },
-        ApiMatrixEntry { api_key: 12, name: "Heartbeat",                   r_kafka_min: 0, r_kafka_max: 4,  flexible_start: Some(4) },
-        ApiMatrixEntry { api_key: 13, name: "LeaveGroup",                  r_kafka_min: 0, r_kafka_max: 5,  flexible_start: Some(4) },
-        ApiMatrixEntry { api_key: 14, name: "SyncGroup",                   r_kafka_min: 0, r_kafka_max: 5,  flexible_start: Some(4) },
-        ApiMatrixEntry { api_key: 15, name: "DescribeGroups",              r_kafka_min: 0, r_kafka_max: 5,  flexible_start: Some(5) },
-        ApiMatrixEntry { api_key: 16, name: "ListGroups",                  r_kafka_min: 0, r_kafka_max: 4,  flexible_start: Some(4) },
-        ApiMatrixEntry { api_key: 17, name: "SaslHandshake",               r_kafka_min: 0, r_kafka_max: 1,  flexible_start: Some(1) },
-        ApiMatrixEntry { api_key: 18, name: "ApiVersions",                 r_kafka_min: 0, r_kafka_max: 3,  flexible_start: Some(3) },
-        ApiMatrixEntry { api_key: 19, name: "CreateTopics",                r_kafka_min: 0, r_kafka_max: 3,  flexible_start: None },
-        ApiMatrixEntry { api_key: 20, name: "DeleteTopics",                r_kafka_min: 0, r_kafka_max: 6,  flexible_start: Some(4) },
-        ApiMatrixEntry { api_key: 21, name: "DeleteRecords",               r_kafka_min: 0, r_kafka_max: 3,  flexible_start: Some(2) },
-        ApiMatrixEntry { api_key: 22, name: "InitProducerId",              r_kafka_min: 0, r_kafka_max: 4,  flexible_start: Some(3) },
-        ApiMatrixEntry { api_key: 23, name: "OffsetForLeaderEpoch",        r_kafka_min: 0, r_kafka_max: 4,  flexible_start: Some(3) },
-        ApiMatrixEntry { api_key: 24, name: "AddPartitionsToTxn",          r_kafka_min: 0, r_kafka_max: 3,  flexible_start: Some(3) },
-        ApiMatrixEntry { api_key: 26, name: "EndTxn",                      r_kafka_min: 0, r_kafka_max: 3,  flexible_start: Some(3) },
-        ApiMatrixEntry { api_key: 32, name: "DescribeConfigs",             r_kafka_min: 0, r_kafka_max: 4,  flexible_start: Some(3) },
-        ApiMatrixEntry { api_key: 33, name: "AlterConfigs",                r_kafka_min: 0, r_kafka_max: 2,  flexible_start: Some(2) },
-        ApiMatrixEntry { api_key: 36, name: "SaslAuthenticate",            r_kafka_min: 0, r_kafka_max: 2,  flexible_start: Some(2) },
-        ApiMatrixEntry { api_key: 37, name: "CreatePartitions",            r_kafka_min: 0, r_kafka_max: 3,  flexible_start: Some(2) },
-        ApiMatrixEntry { api_key: 43, name: "ElectLeaders",                r_kafka_min: 0, r_kafka_max: 2,  flexible_start: Some(2) },
-        ApiMatrixEntry { api_key: 44, name: "IncrementalAlterConfigs",     r_kafka_min: 0, r_kafka_max: 0,  flexible_start: Some(0) },
-        ApiMatrixEntry { api_key: 45, name: "AlterPartitionReassignments", r_kafka_min: 0, r_kafka_max: 0,  flexible_start: Some(0) },
-        ApiMatrixEntry { api_key: 46, name: "ListPartitionReassignments",  r_kafka_min: 0, r_kafka_max: 0,  flexible_start: Some(0) },
-        ApiMatrixEntry { api_key: 47, name: "OffsetDelete",                r_kafka_min: 0, r_kafka_max: 0,  flexible_start: Some(0) },
-        ApiMatrixEntry { api_key: 56, name: "DescribeQuorum",              r_kafka_min: 0, r_kafka_max: 0,  flexible_start: Some(0) },
-        ApiMatrixEntry { api_key: 60, name: "DescribeCluster",             r_kafka_min: 0, r_kafka_max: 0,  flexible_start: Some(0) },
-        ApiMatrixEntry { api_key: 61, name: "DescribeProducers",           r_kafka_min: 0, r_kafka_max: 0,  flexible_start: Some(0) },
-        ApiMatrixEntry { api_key: 65, name: "ListTransactions",            r_kafka_min: 0, r_kafka_max: 0,  flexible_start: Some(0) },
-        ApiMatrixEntry { api_key: 70, name: "DescribeTopics",              r_kafka_min: 0, r_kafka_max: 0,  flexible_start: Some(0) },
+        ApiMatrixEntry {
+            api_key: 0,
+            name: "Produce",
+            r_kafka_min: 0,
+            r_kafka_max: 10,
+            flexible_start: Some(9),
+        },
+        ApiMatrixEntry {
+            api_key: 1,
+            name: "Fetch",
+            r_kafka_min: 0,
+            r_kafka_max: 16,
+            flexible_start: Some(12),
+        },
+        ApiMatrixEntry {
+            api_key: 2,
+            name: "ListOffsets",
+            r_kafka_min: 0,
+            r_kafka_max: 8,
+            flexible_start: Some(7),
+        },
+        ApiMatrixEntry {
+            api_key: 3,
+            name: "Metadata",
+            r_kafka_min: 0,
+            r_kafka_max: 13,
+            flexible_start: Some(9),
+        },
+        ApiMatrixEntry {
+            api_key: 4,
+            name: "LeaderAndIsr",
+            r_kafka_min: 0,
+            r_kafka_max: 6,
+            flexible_start: None,
+        },
+        ApiMatrixEntry {
+            api_key: 5,
+            name: "StopReplica",
+            r_kafka_min: 0,
+            r_kafka_max: 3,
+            flexible_start: None,
+        },
+        ApiMatrixEntry {
+            api_key: 6,
+            name: "UpdateMetadata",
+            r_kafka_min: 0,
+            r_kafka_max: 9,
+            flexible_start: None,
+        },
+        ApiMatrixEntry {
+            api_key: 7,
+            name: "ControlledShutdown",
+            r_kafka_min: 0,
+            r_kafka_max: 3,
+            flexible_start: None,
+        },
+        ApiMatrixEntry {
+            api_key: 8,
+            name: "OffsetCommit",
+            r_kafka_min: 0,
+            r_kafka_max: 9,
+            flexible_start: Some(8),
+        },
+        ApiMatrixEntry {
+            api_key: 9,
+            name: "OffsetFetch",
+            r_kafka_min: 0,
+            r_kafka_max: 9,
+            flexible_start: Some(8),
+        },
+        ApiMatrixEntry {
+            api_key: 10,
+            name: "FindCoordinator",
+            r_kafka_min: 0,
+            r_kafka_max: 4,
+            flexible_start: Some(4),
+        },
+        ApiMatrixEntry {
+            api_key: 11,
+            name: "JoinGroup",
+            r_kafka_min: 0,
+            r_kafka_max: 9,
+            flexible_start: Some(6),
+        },
+        ApiMatrixEntry {
+            api_key: 12,
+            name: "Heartbeat",
+            r_kafka_min: 0,
+            r_kafka_max: 4,
+            flexible_start: Some(4),
+        },
+        ApiMatrixEntry {
+            api_key: 13,
+            name: "LeaveGroup",
+            r_kafka_min: 0,
+            r_kafka_max: 5,
+            flexible_start: Some(4),
+        },
+        ApiMatrixEntry {
+            api_key: 14,
+            name: "SyncGroup",
+            r_kafka_min: 0,
+            r_kafka_max: 5,
+            flexible_start: Some(4),
+        },
+        ApiMatrixEntry {
+            api_key: 15,
+            name: "DescribeGroups",
+            r_kafka_min: 0,
+            r_kafka_max: 5,
+            flexible_start: Some(5),
+        },
+        ApiMatrixEntry {
+            api_key: 16,
+            name: "ListGroups",
+            r_kafka_min: 0,
+            r_kafka_max: 4,
+            flexible_start: Some(4),
+        },
+        ApiMatrixEntry {
+            api_key: 17,
+            name: "SaslHandshake",
+            r_kafka_min: 0,
+            r_kafka_max: 1,
+            flexible_start: Some(1),
+        },
+        ApiMatrixEntry {
+            api_key: 18,
+            name: "ApiVersions",
+            r_kafka_min: 0,
+            r_kafka_max: 3,
+            flexible_start: Some(3),
+        },
+        ApiMatrixEntry {
+            api_key: 19,
+            name: "CreateTopics",
+            r_kafka_min: 0,
+            r_kafka_max: 3,
+            flexible_start: None,
+        },
+        ApiMatrixEntry {
+            api_key: 20,
+            name: "DeleteTopics",
+            r_kafka_min: 0,
+            r_kafka_max: 6,
+            flexible_start: Some(4),
+        },
+        ApiMatrixEntry {
+            api_key: 21,
+            name: "DeleteRecords",
+            r_kafka_min: 0,
+            r_kafka_max: 3,
+            flexible_start: Some(2),
+        },
+        ApiMatrixEntry {
+            api_key: 22,
+            name: "InitProducerId",
+            r_kafka_min: 0,
+            r_kafka_max: 4,
+            flexible_start: Some(3),
+        },
+        ApiMatrixEntry {
+            api_key: 23,
+            name: "OffsetForLeaderEpoch",
+            r_kafka_min: 0,
+            r_kafka_max: 4,
+            flexible_start: Some(3),
+        },
+        ApiMatrixEntry {
+            api_key: 24,
+            name: "AddPartitionsToTxn",
+            r_kafka_min: 0,
+            r_kafka_max: 3,
+            flexible_start: Some(3),
+        },
+        ApiMatrixEntry {
+            api_key: 26,
+            name: "EndTxn",
+            r_kafka_min: 0,
+            r_kafka_max: 3,
+            flexible_start: Some(3),
+        },
+        ApiMatrixEntry {
+            api_key: 32,
+            name: "DescribeConfigs",
+            r_kafka_min: 0,
+            r_kafka_max: 4,
+            flexible_start: Some(3),
+        },
+        ApiMatrixEntry {
+            api_key: 33,
+            name: "AlterConfigs",
+            r_kafka_min: 0,
+            r_kafka_max: 2,
+            flexible_start: Some(2),
+        },
+        ApiMatrixEntry {
+            api_key: 36,
+            name: "SaslAuthenticate",
+            r_kafka_min: 0,
+            r_kafka_max: 2,
+            flexible_start: Some(2),
+        },
+        ApiMatrixEntry {
+            api_key: 37,
+            name: "CreatePartitions",
+            r_kafka_min: 0,
+            r_kafka_max: 3,
+            flexible_start: Some(2),
+        },
+        ApiMatrixEntry {
+            api_key: 43,
+            name: "ElectLeaders",
+            r_kafka_min: 0,
+            r_kafka_max: 2,
+            flexible_start: Some(2),
+        },
+        ApiMatrixEntry {
+            api_key: 44,
+            name: "IncrementalAlterConfigs",
+            r_kafka_min: 0,
+            r_kafka_max: 0,
+            flexible_start: Some(0),
+        },
+        ApiMatrixEntry {
+            api_key: 45,
+            name: "AlterPartitionReassignments",
+            r_kafka_min: 0,
+            r_kafka_max: 0,
+            flexible_start: Some(0),
+        },
+        ApiMatrixEntry {
+            api_key: 46,
+            name: "ListPartitionReassignments",
+            r_kafka_min: 0,
+            r_kafka_max: 0,
+            flexible_start: Some(0),
+        },
+        ApiMatrixEntry {
+            api_key: 47,
+            name: "OffsetDelete",
+            r_kafka_min: 0,
+            r_kafka_max: 0,
+            flexible_start: Some(0),
+        },
+        ApiMatrixEntry {
+            api_key: 56,
+            name: "DescribeQuorum",
+            r_kafka_min: 0,
+            r_kafka_max: 0,
+            flexible_start: Some(0),
+        },
+        ApiMatrixEntry {
+            api_key: 60,
+            name: "DescribeCluster",
+            r_kafka_min: 0,
+            r_kafka_max: 0,
+            flexible_start: Some(0),
+        },
+        ApiMatrixEntry {
+            api_key: 61,
+            name: "DescribeProducers",
+            r_kafka_min: 0,
+            r_kafka_max: 0,
+            flexible_start: Some(0),
+        },
+        ApiMatrixEntry {
+            api_key: 65,
+            name: "ListTransactions",
+            r_kafka_min: 0,
+            r_kafka_max: 0,
+            flexible_start: Some(0),
+        },
+        ApiMatrixEntry {
+            api_key: 70,
+            name: "DescribeTopics",
+            r_kafka_min: 0,
+            r_kafka_max: 0,
+            flexible_start: Some(0),
+        },
     ]
 }
 
@@ -255,7 +518,10 @@ async fn test_api_versions_compatibility_matrix() {
     assert_eq!(error_code, 0, "ApiVersions should succeed");
 
     let api_count = reader.read_i32().unwrap();
-    assert!(api_count >= 35, "Should have at least 35 APIs, got {api_count}");
+    assert!(
+        api_count >= 35,
+        "Should have at least 35 APIs, got {api_count}"
+    );
 
     // 解析所有 API 版本
     let mut server_versions: Vec<(i16, i16, i16)> = Vec::new(); // (api_key, min, max)
@@ -272,30 +538,46 @@ async fn test_api_versions_compatibility_matrix() {
         let found = server_versions.iter().find(|(k, _, _)| *k == entry.api_key);
         match found {
             Some((_, min, max)) => {
-                assert_eq!(*min, entry.r_kafka_min,
+                assert_eq!(
+                    *min, entry.r_kafka_min,
                     "API {} ({}) min_version mismatch: server={}, expected={}",
-                    entry.api_key, entry.name, min, entry.r_kafka_min);
-                assert_eq!(*max, entry.r_kafka_max,
+                    entry.api_key, entry.name, min, entry.r_kafka_min
+                );
+                assert_eq!(
+                    *max, entry.r_kafka_max,
                     "API {} ({}) max_version mismatch: server={}, expected={}",
-                    entry.api_key, entry.name, max, entry.r_kafka_max);
+                    entry.api_key, entry.name, max, entry.r_kafka_max
+                );
             }
             None => {
                 // KRaft 内部 API (4-7, 51-55) 可能不在 ApiVersions 列表中
                 // 因为它们是通过内部路由而非客户端请求
-                let is_internal = matches!(entry.api_key, 4|5|6|7|51|52|53|54|55);
+                let is_internal = matches!(entry.api_key, 4 | 5 | 6 | 7 | 51 | 52 | 53 | 54 | 55);
                 if !is_internal {
-                    panic!("API {} ({}) not found in ApiVersions response", entry.api_key, entry.name);
+                    panic!(
+                        "API {} ({}) not found in ApiVersions response",
+                        entry.api_key, entry.name
+                    );
                 }
             }
         }
     }
 
     // 统计覆盖率
-    let client_apis = matrix.iter().filter(|e| !matches!(e.api_key, 4|5|6|7|51|52|53|54|55)).count();
-    let matched = server_versions.iter().filter(|(k, _, _)| {
-        matrix.iter().any(|e| e.api_key == *k)
-    }).count();
-    assert!(matched >= client_apis - 5, "Should match most client APIs: matched={}, expected~={}", matched, client_apis);
+    let client_apis = matrix
+        .iter()
+        .filter(|e| !matches!(e.api_key, 4 | 5 | 6 | 7 | 51 | 52 | 53 | 54 | 55))
+        .count();
+    let matched = server_versions
+        .iter()
+        .filter(|(k, _, _)| matrix.iter().any(|e| e.api_key == *k))
+        .count();
+    assert!(
+        matched >= client_apis - 5,
+        "Should match most client APIs: matched={}, expected~={}",
+        matched,
+        client_apis
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -313,11 +595,11 @@ async fn test_api_versions_v3_flexible() {
     let mut w = KafkaWriter::new(&mut buf);
     // Flexible RequestHeader (v2)
     w.write_i16(18); // api_key
-    w.write_i16(3);  // api_version
+    w.write_i16(3); // api_version
     w.write_i32(42); // correlation_id
     w.write_compact_nullable_string(Some("rk-matrix-v3")); // client_id
     w.write_tagged_fields(&[]); // header tagged fields
-    // v3 body: client_software_name + client_software_version
+                                // v3 body: client_software_name + client_software_version
     w.write_compact_nullable_string(Some("r-kafka-test"));
     w.write_compact_nullable_string(Some("0.1.0"));
     w.write_tagged_fields(&[]); // body tagged fields
@@ -342,7 +624,10 @@ async fn test_api_versions_v3_flexible() {
     // compact_array length is unsigned_varint (value = actual_count + 1)
     let api_count_raw = reader.read_unsigned_varint().unwrap() as i32;
     let api_count = api_count_raw - 1; // compact arrays encode length+1
-    assert!(api_count >= 35, "Should have 35+ APIs in v3 response, got {api_count}");
+    assert!(
+        api_count >= 35,
+        "Should have 35+ APIs in v3 response, got {api_count}"
+    );
 
     for _ in 0..api_count {
         let _api_key = reader.read_i16().unwrap();
@@ -369,16 +654,16 @@ async fn test_kip853_static_membership() {
     let mut stream = connect(port).await;
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 11, 5, 10, "rk-static-1");
-        w.write_string("static-group");       // group_id
-        w.write_i32(30000);                    // session_timeout_ms (v1+)
-        w.write_i32(60000);                    // rebalance_timeout_ms (v4+)
-        w.write_string("");                    // member_id (empty = new member)
+        w.write_string("static-group"); // group_id
+        w.write_i32(30000); // session_timeout_ms (v1+)
+        w.write_i32(60000); // rebalance_timeout_ms (v4+)
+        w.write_string(""); // member_id (empty = new member)
         w.write_nullable_string(Some("instance-1")); // group_instance_id (v5+)
-        w.write_string("consumer");            // protocol_type
-        // protocols (array)
+        w.write_string("consumer"); // protocol_type
+                                    // protocols (array)
         w.write_i32(1);
         w.write_string("range");
-        w.write_bytes(&[0u8; 0]);              // metadata
+        w.write_bytes(&[0u8; 0]); // metadata
     });
     stream.write_all(&frame).await.unwrap();
     let resp = read_response_frame(&mut stream).await;
@@ -387,7 +672,10 @@ async fn test_kip853_static_membership() {
     // JoinGroup v5: throttle_time (v2+) + error_code + generation_id + ...
     let _throttle = reader.read_i32().unwrap();
     let error_code = reader.read_i16().unwrap();
-    assert_eq!(error_code, 0, "JoinGroup v5 with static membership should succeed");
+    assert_eq!(
+        error_code, 0,
+        "JoinGroup v5 with static membership should succeed"
+    );
     let generation_id = reader.read_i32().unwrap();
     assert!(generation_id > 0);
     // v5 < 7: no protocol_type field. Only protocol_name (nullable_string)
@@ -409,8 +697,8 @@ async fn test_kip853_static_membership() {
         w.write_i32(generation_id);
         w.write_string(&member_id);
         w.write_nullable_string(Some("instance-1")); // group_instance_id (v3+)
-        // v3: no protocol_type/name (v5+ only)
-        // assignments
+                                                     // v3: no protocol_type/name (v5+ only)
+                                                     // assignments
         w.write_i32(1); // 1 assignment
         w.write_string(&member_id);
         w.write_bytes(&[10, 20, 30]); // assignment data
@@ -421,7 +709,10 @@ async fn test_kip853_static_membership() {
     let _corr = reader.read_i32().unwrap();
     let _throttle = reader.read_i32().unwrap(); // v1+
     let sync_error = reader.read_i16().unwrap();
-    assert_eq!(sync_error, 0, "SyncGroup v3 with static membership should succeed");
+    assert_eq!(
+        sync_error, 0,
+        "SyncGroup v3 with static membership should succeed"
+    );
     let _assignment = reader.read_bytes();
 
     // === Step 3: Heartbeat v3 with group_instance_id ===
@@ -438,7 +729,10 @@ async fn test_kip853_static_membership() {
     let _corr = reader.read_i32().unwrap();
     let _throttle = reader.read_i32().unwrap(); // v1+
     let hb_error = reader.read_i16().unwrap();
-    assert_eq!(hb_error, 0, "Heartbeat v3 with static membership should succeed");
+    assert_eq!(
+        hb_error, 0,
+        "Heartbeat v3 with static membership should succeed"
+    );
 
     // === Step 4: 第二个 static member ===
     let frame = build_legacy_frame(|w| {
@@ -482,7 +776,7 @@ async fn test_kip848_consumer_group_baseline() {
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 11, 0, 20, "consumer-1");
         w.write_string("kip848-group");
-        w.write_string("");          // new member
+        w.write_string(""); // new member
         w.write_string("consumer");
         w.write_i32(1);
         w.write_string("range");
@@ -664,7 +958,7 @@ async fn test_flexible_version_boundary() {
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 10, 3, 2, "rk-flex-test");
         w.write_string("test-group"); // key
-        w.write_i8(0);                // key_type = GROUP
+        w.write_i8(0); // key_type = GROUP
     });
     stream.write_all(&frame).await.unwrap();
     let resp = read_response_frame(&mut stream).await;
@@ -680,9 +974,9 @@ async fn test_flexible_version_boundary() {
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 11, 5, 3, "rk-flex-test");
         w.write_string("flex-group");
-        w.write_i32(30000);           // session_timeout_ms
-        w.write_i32(60000);           // rebalance_timeout_ms
-        w.write_string("");           // member_id
+        w.write_i32(30000); // session_timeout_ms
+        w.write_i32(60000); // rebalance_timeout_ms
+        w.write_string(""); // member_id
         w.write_nullable_string(None); // group_instance_id
         w.write_string("consumer");
         w.write_i32(1);
@@ -727,7 +1021,7 @@ async fn test_flexible_version_boundary() {
         w.write_i32(0); // generation_id (v1+)
         w.write_string(""); // member_id (v1+)
         w.write_nullable_string(None); // group_instance_id (v7+)
-        // v7 > v4: no retention_time_ms
+                                       // v7 > v4: no retention_time_ms
         w.write_i32(1); // 1 topic
         w.write_string("test-topic");
         w.write_i32(1); // 1 partition
@@ -772,8 +1066,12 @@ async fn test_kip848_missing_apis_evaluation() {
         let api_key = reader.read_i16().unwrap();
         let _min = reader.read_i16().unwrap();
         let _max = reader.read_i16().unwrap();
-        if api_key == 68 { has_consumer_group_heartbeat = true; }
-        if api_key == 69 { has_consumer_group_describe = true; }
+        if api_key == 68 {
+            has_consumer_group_heartbeat = true;
+        }
+        if api_key == 69 {
+            has_consumer_group_describe = true;
+        }
     }
 
     // KIP-848 APIs 不在当前支持范围 — 这是预期的
@@ -801,7 +1099,10 @@ async fn test_kip848_missing_apis_evaluation() {
     let mut reader = KafkaReader::new(&resp);
     let _corr = reader.read_i32().unwrap();
     let error = reader.read_i16().unwrap();
-    assert_eq!(error, 0, "Traditional JoinGroup should work as KIP-848 baseline");
+    assert_eq!(
+        error, 0,
+        "Traditional JoinGroup should work as KIP-848 baseline"
+    );
 
     // 验证 ListGroups 能列出组
     let frame = build_legacy_frame(|w| {
@@ -834,12 +1135,12 @@ async fn test_multi_version_produce_compatibility() {
     let batch = make_test_batch(0, 1);
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 0, 0, 1, "rk-mv-prod");
-        w.write_i16(1);    // acks (v1+... actually v0 has it too in practice)
+        w.write_i16(1); // acks (v1+... actually v0 has it too in practice)
         w.write_i32(3000); // timeout_ms
-        w.write_i32(1);    // 1 topic
+        w.write_i32(1); // 1 topic
         w.write_string("mv-produce");
-        w.write_i32(1);    // 1 partition
-        w.write_i32(0);    // partition 0
+        w.write_i32(1); // 1 partition
+        w.write_i32(0); // partition 0
         w.write_bytes(&batch);
     });
     stream.write_all(&frame).await.unwrap();
@@ -862,7 +1163,7 @@ async fn test_multi_version_produce_compatibility() {
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 0, 3, 2, "rk-mv-prod");
         w.write_nullable_string(None); // transactional_id (v3+)
-        w.write_i16(1);    // acks
+        w.write_i16(1); // acks
         w.write_i32(3000); // timeout_ms
         w.write_i32(1);
         w.write_string("mv-produce");
@@ -919,14 +1220,14 @@ async fn test_multi_version_fetch_compatibility() {
     // Fetch v0
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 1, 0, 2, "rk-mv-fetch");
-        w.write_i32(-1);   // replica_id
-        w.write_i32(100);  // max_wait_ms
-        w.write_i32(1);    // min_bytes
-        w.write_i32(1);    // 1 topic
+        w.write_i32(-1); // replica_id
+        w.write_i32(100); // max_wait_ms
+        w.write_i32(1); // min_bytes
+        w.write_i32(1); // 1 topic
         w.write_string("mv-fetch");
-        w.write_i32(1);    // 1 partition
-        w.write_i32(0);    // partition 0
-        w.write_i64(0);    // fetch_offset
+        w.write_i32(1); // 1 partition
+        w.write_i32(0); // partition 0
+        w.write_i64(0); // fetch_offset
         w.write_i32(65536); // max_bytes
     });
     stream.write_all(&frame).await.unwrap();
@@ -940,19 +1241,19 @@ async fn test_multi_version_fetch_compatibility() {
     // Fetch v4 (with isolation_level)
     let frame = build_legacy_frame(|w| {
         write_legacy_header(w, 1, 4, 3, "rk-mv-fetch");
-        w.write_i32(-1);   // replica_id
-        w.write_i32(100);  // max_wait_ms
-        w.write_i32(1);    // min_bytes
+        w.write_i32(-1); // replica_id
+        w.write_i32(100); // max_wait_ms
+        w.write_i32(1); // min_bytes
         w.write_i32(65536); // max_bytes (v3+)
-        w.write_i8(0);     // isolation_level (v4+)
-        w.write_i32(1);    // 1 topic
+        w.write_i8(0); // isolation_level (v4+)
+        w.write_i32(1); // 1 topic
         w.write_string("mv-fetch");
-        w.write_i32(1);    // 1 partition
-        w.write_i32(0);    // partition 0
-        w.write_i64(0);    // fetch_offset
-        w.write_i64(0);    // log_start_offset (v5+... no, v4 has it? let me check)
-        // v4 partition: partition_index + fetch_offset + max_bytes + log_start_offset
-        // Actually v5 adds log_start_offset. v4 has: partition + offset + max_bytes
+        w.write_i32(1); // 1 partition
+        w.write_i32(0); // partition 0
+        w.write_i64(0); // fetch_offset
+        w.write_i64(0); // log_start_offset (v5+... no, v4 has it? let me check)
+                        // v4 partition: partition_index + fetch_offset + max_bytes + log_start_offset
+                        // Actually v5 adds log_start_offset. v4 has: partition + offset + max_bytes
         w.write_i32(65536); // max_bytes
     });
     stream.write_all(&frame).await.unwrap();

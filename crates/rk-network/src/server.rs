@@ -36,31 +36,29 @@ pub async fn start_listener(config: &BrokerConfig) -> rk_core::Result<TcpListene
         socket2::Type::STREAM,
         None,
     )
-    .map_err(|e| rk_core::RkError::Io(e))?;
+    .map_err(rk_core::RkError::Io)?;
 
     // SO_REUSEADDR: 允许快速重启时重用地址
     socket
         .set_reuse_address(true)
-        .map_err(|e| rk_core::RkError::Io(e))?;
+        .map_err(rk_core::RkError::Io)?;
 
     // SO_REUSEPORT: 将连接均匀分发到多个 socket
     #[cfg(unix)]
     socket
         .set_reuse_port(true)
-        .map_err(|e| rk_core::RkError::Io(e))?;
+        .map_err(rk_core::RkError::Io)?;
 
     // 非阻塞模式 (Tokio 需要)
     socket
         .set_nonblocking(true)
-        .map_err(|e| rk_core::RkError::Io(e))?;
+        .map_err(rk_core::RkError::Io)?;
 
     socket
         .bind(&socket2::SockAddr::from(addr))
-        .map_err(|e| rk_core::RkError::Io(e))?;
+        .map_err(rk_core::RkError::Io)?;
 
-    socket
-        .listen(1024)
-        .map_err(|e| rk_core::RkError::Io(e))?;
+    socket.listen(1024).map_err(rk_core::RkError::Io)?;
 
     let listener: std::net::TcpListener = socket.into();
     let tokio_listener = TcpListener::from_std(listener)?;
@@ -73,10 +71,7 @@ pub async fn start_listener(config: &BrokerConfig) -> rk_core::Result<TcpListene
 ///
 /// 接受 TCP 连接并为每个连接 spawn 一个异步任务。
 /// 支持通过 shutdown_rx 信号优雅关闭。
-pub async fn run_server(
-    config: &BrokerConfig,
-    router: Arc<BrokerRouter>,
-) -> rk_core::Result<()> {
+pub async fn run_server(config: &BrokerConfig, router: Arc<BrokerRouter>) -> rk_core::Result<()> {
     let listener = start_listener(config).await?;
     let flow_controller = Arc::new(FlowController::new(config));
 
@@ -165,7 +160,8 @@ mod tests {
             r#"[broker]
             host = "invalid_host_name_that_does_not_exist.example"
             port = 19999"#,
-        ).unwrap();
+        )
+        .unwrap();
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         let result = rt.block_on(start_listener(&config));

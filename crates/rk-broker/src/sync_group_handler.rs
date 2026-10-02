@@ -22,11 +22,7 @@ impl SyncGroupHandler {
     }
 
     /// 处理 SyncGroup 请求
-    pub fn handle(
-        &self,
-        request: SyncGroupRequest,
-        _version: i16,
-    ) -> Result<SyncGroupResponse> {
+    pub fn handle(&self, request: SyncGroupRequest, _version: i16) -> Result<SyncGroupResponse> {
         debug!(
             group_id = %request.group_id,
             member_id = %request.member_id,
@@ -77,9 +73,9 @@ mod tests {
         let gm = Arc::new(GroupManager::new());
 
         // 先 join
-        let (gen, mid, _leader, _proto, _members) = gm.join_group(
-            "test-group", "", None, "consumer", vec![],
-        ).unwrap();
+        let (gen, mid, _leader, _proto, _members) = gm
+            .join_group("test-group", "", None, "consumer", vec![])
+            .unwrap();
 
         let handler = SyncGroupHandler::new(gm);
 
@@ -105,9 +101,9 @@ mod tests {
     fn test_sync_group_handler_wrong_generation() {
         let gm = Arc::new(GroupManager::new());
 
-        let (_gen, mid, _leader, _proto, _members) = gm.join_group(
-            "test-group", "", None, "consumer", vec![],
-        ).unwrap();
+        let (_gen, mid, _leader, _proto, _members) = gm
+            .join_group("test-group", "", None, "consumer", vec![])
+            .unwrap();
 
         let handler = SyncGroupHandler::new(gm);
 

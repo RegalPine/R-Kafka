@@ -2,10 +2,10 @@
 //!
 //! KRaft 投票请求: 候选人请求其他节点投票。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -30,11 +30,17 @@ impl KafkaRequestDecoder for VoteRequest {
             let candidate_epoch = reader.read_i32()?;
             let last_offset = reader.read_i64()?;
             let _tags = reader.read_tagged_fields()?;
-            Ok(Self { cluster_id, candidate_id, candidate_epoch, last_offset })
+            Ok(Self {
+                cluster_id,
+                candidate_id,
+                candidate_epoch,
+                last_offset,
+            })
         } else {
-            Err(rk_core::error::RkError::Protocol(
-                format!("Unsupported Vote API version: {}", version),
-            ))
+            Err(rk_core::error::RkError::Protocol(format!(
+                "Unsupported Vote API version: {}",
+                version
+            )))
         }
     }
 }
@@ -72,9 +78,9 @@ mod tests {
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
         w.write_compact_string("cluster-1");
-        w.write_i32(1);       // candidate_id
-        w.write_i32(5);       // candidate_epoch
-        w.write_i64(100);     // last_offset
+        w.write_i32(1); // candidate_id
+        w.write_i32(5); // candidate_epoch
+        w.write_i64(100); // last_offset
         w.write_tagged_fields(&[]);
 
         let mut reader = KafkaReader::new(&buf);

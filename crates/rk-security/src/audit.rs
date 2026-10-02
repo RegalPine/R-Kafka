@@ -456,8 +456,7 @@ mod tests {
 
     #[test]
     fn test_audit_event_to_json() {
-        let event = AuditEvent::new(AuditEventType::AuthSuccess)
-            .with_principal("User:alice");
+        let event = AuditEvent::new(AuditEventType::AuthSuccess).with_principal("User:alice");
         let json = event.to_json();
         // serde serializes enum variant as "AuthSuccess"
         assert!(json.contains("AuthSuccess"));
@@ -655,8 +654,7 @@ mod tests {
 
     #[test]
     fn test_audit_event_display() {
-        let event = AuditEvent::new(AuditEventType::AuthSuccess)
-            .with_principal("User:alice");
+        let event = AuditEvent::new(AuditEventType::AuthSuccess).with_principal("User:alice");
         let display = format!("{}", event);
         assert!(display.contains("AUTH_SUCCESS"));
         assert!(display.contains("User:alice"));

@@ -27,9 +27,9 @@
 //!   value         (bytes) variable
 //! ```
 
-use rk_core::error::{RkError, Result};
 use crate::record::{CompressionType, RECORDBATCH_MAGIC};
 use crate::types::KafkaReader;
+use rk_core::error::{Result, RkError};
 
 /// 旧格式单条 Message
 #[derive(Debug, Clone)]
@@ -87,9 +87,7 @@ pub fn decode_message_set(reader: &mut KafkaReader) -> Result<LegacyMessageSet> 
                 ));
             }
             _ => {
-                return Err(RkError::Protocol(format!(
-                    "Unknown message magic: {magic}"
-                )));
+                return Err(RkError::Protocol(format!("Unknown message magic: {magic}")));
             }
         }
 
@@ -164,7 +162,11 @@ pub fn convert_to_v2_batch(messages: &LegacyMessageSet) -> Result<Vec<u8>> {
     let mut base_timestamp = i64::MAX;
     let mut max_timestamp = i64::MIN;
     for msg in &messages.messages {
-        let ts = if msg.timestamp_ms == 0 { 0 } else { msg.timestamp_ms };
+        let ts = if msg.timestamp_ms == 0 {
+            0
+        } else {
+            msg.timestamp_ms
+        };
         base_timestamp = base_timestamp.min(ts);
         max_timestamp = max_timestamp.max(ts);
     }
@@ -240,7 +242,11 @@ fn encode_v2_record(msg: &LegacyMessage, offset_delta: i32) -> Vec<u8> {
     // attributes (i8)
     record_buf.push(0);
     // timestamp_delta (varint)
-    let ts_delta = if msg.timestamp_ms > 0 { msg.timestamp_ms } else { 0 };
+    let ts_delta = if msg.timestamp_ms > 0 {
+        msg.timestamp_ms
+    } else {
+        0
+    };
     write_unsigned_varint(&mut record_buf, zigzag64(ts_delta));
     // offset_delta (varint)
     write_unsigned_varint(&mut record_buf, zigzag32(offset_delta) as u64);

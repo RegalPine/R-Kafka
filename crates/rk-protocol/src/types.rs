@@ -6,7 +6,7 @@
 //! 每种类型提供 `read` (从 KafkaReader) 和 `write` (到 KafkaWriter) 方法。
 
 use bytes::BufMut;
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use std::string::FromUtf8Error;
 
 // ─── KafkaReader: 零拷贝读取器 ──────────────────────────────────────
@@ -37,7 +37,10 @@ impl<'a> KafkaReader<'a> {
     /// 前进 n 字节，返回跳过的切片
     pub fn advance(&mut self, n: usize) -> Result<&'a [u8]> {
         if self.remaining() < n {
-            return Err(RkError::BufferUnderflow { need: n, have: self.remaining() });
+            return Err(RkError::BufferUnderflow {
+                need: n,
+                have: self.remaining(),
+            });
         }
         let slice = &self.buf[self.pos..self.pos + n];
         self.pos += n;
@@ -63,7 +66,9 @@ impl<'a> KafkaReader<'a> {
 
     pub fn read_i64(&mut self) -> Result<i64> {
         let s = self.advance(8)?;
-        Ok(i64::from_be_bytes([s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]]))
+        Ok(i64::from_be_bytes([
+            s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7],
+        ]))
     }
 
     pub fn read_u32(&mut self) -> Result<u32> {
@@ -73,12 +78,16 @@ impl<'a> KafkaReader<'a> {
 
     pub fn read_u64(&mut self) -> Result<u64> {
         let s = self.advance(8)?;
-        Ok(u64::from_be_bytes([s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]]))
+        Ok(u64::from_be_bytes([
+            s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7],
+        ]))
     }
 
     pub fn read_f64(&mut self) -> Result<f64> {
         let s = self.advance(8)?;
-        Ok(f64::from_be_bytes([s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]]))
+        Ok(f64::from_be_bytes([
+            s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7],
+        ]))
     }
 
     pub fn read_bool(&mut self) -> Result<bool> {
@@ -117,7 +126,9 @@ impl<'a> KafkaReader<'a> {
     pub fn read_compact_string(&mut self) -> Result<String> {
         let len = self.read_unsigned_varint()? as usize;
         if len == 0 {
-            return Err(RkError::InvalidDataType("unexpected null COMPACT_STRING".into()));
+            return Err(RkError::InvalidDataType(
+                "unexpected null COMPACT_STRING".into(),
+            ));
         }
         let actual_len = len - 1;
         let bytes = self.advance(actual_len)?;
@@ -241,9 +252,11 @@ impl<'a> KafkaReader<'a> {
         // 安全限制: 数组元素数不超过剩余字节数 (每个元素至少 1 字节)
         let len_usize = len as usize;
         if len_usize > self.remaining() {
-            return Err(rk_core::error::RkError::Protocol(
-                format!("Array length {} exceeds remaining bytes {}", len, self.remaining())
-            ));
+            return Err(rk_core::error::RkError::Protocol(format!(
+                "Array length {} exceeds remaining bytes {}",
+                len,
+                self.remaining()
+            )));
         }
         let mut items = Vec::with_capacity(len_usize);
         for _ in 0..len {
@@ -264,9 +277,11 @@ impl<'a> KafkaReader<'a> {
         // 安全限制
         let len_usize = len as usize;
         if len_usize > self.remaining() {
-            return Err(rk_core::error::RkError::Protocol(
-                format!("Array length {} exceeds remaining bytes {}", len, self.remaining())
-            ));
+            return Err(rk_core::error::RkError::Protocol(format!(
+                "Array length {} exceeds remaining bytes {}",
+                len,
+                self.remaining()
+            )));
         }
         let mut items = Vec::with_capacity(len_usize);
         for _ in 0..len {
@@ -287,9 +302,11 @@ impl<'a> KafkaReader<'a> {
         let actual_len = len - 1;
         // 安全限制
         if actual_len > self.remaining() {
-            return Err(rk_core::error::RkError::Protocol(
-                format!("Compact array length {} exceeds remaining bytes {}", actual_len, self.remaining())
-            ));
+            return Err(rk_core::error::RkError::Protocol(format!(
+                "Compact array length {} exceeds remaining bytes {}",
+                actual_len,
+                self.remaining()
+            )));
         }
         let mut items = Vec::with_capacity(actual_len);
         for _ in 0..actual_len {
@@ -309,9 +326,11 @@ impl<'a> KafkaReader<'a> {
         }
         let actual_len = len - 1;
         if actual_len > self.remaining() {
-            return Err(rk_core::error::RkError::Protocol(
-                format!("Compact nullable array length {} exceeds remaining bytes {}", actual_len, self.remaining())
-            ));
+            return Err(rk_core::error::RkError::Protocol(format!(
+                "Compact nullable array length {} exceeds remaining bytes {}",
+                actual_len,
+                self.remaining()
+            )));
         }
         let mut items = Vec::with_capacity(actual_len);
         for _ in 0..actual_len {

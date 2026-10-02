@@ -15,14 +15,9 @@ pub enum AuthState {
     /// 未认证 (初始状态 / 无需认证)
     NotAuthenticated,
     /// SASL 握手完成，等待认证数据
-    SaslHandshaked {
-        mechanism: String,
-    },
+    SaslHandshaked { mechanism: String },
     /// 已认证
-    Authenticated {
-        username: String,
-        mechanism: String,
-    },
+    Authenticated { username: String, mechanism: String },
 }
 
 /// 连接会话: 跟踪每个客户端连接的状态
@@ -107,7 +102,10 @@ impl ConnectionSession {
             mechanism = %mechanism,
             "Client authenticated"
         );
-        self.auth_state = AuthState::Authenticated { username, mechanism };
+        self.auth_state = AuthState::Authenticated {
+            username,
+            mechanism,
+        };
     }
 
     /// 递增请求计数
@@ -176,7 +174,9 @@ mod tests {
         assert!(!session.is_authenticated());
         assert_eq!(
             session.auth_state(),
-            &AuthState::SaslHandshaked { mechanism: "PLAIN".to_string() }
+            &AuthState::SaslHandshaked {
+                mechanism: "PLAIN".to_string()
+            }
         );
 
         // 2. SASL Authenticate
@@ -201,7 +201,10 @@ mod tests {
         assert_eq!(session.client_id(), Some("test-client-1"));
 
         session.set_client_software("kafka-python".to_string(), "2.0.0".to_string());
-        assert_eq!(session.client_software_name, Some("kafka-python".to_string()));
+        assert_eq!(
+            session.client_software_name,
+            Some("kafka-python".to_string())
+        );
         assert_eq!(session.client_software_version, Some("2.0.0".to_string()));
     }
 

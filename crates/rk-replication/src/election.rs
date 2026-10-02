@@ -22,7 +22,7 @@
 
 use std::collections::HashSet;
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use rk_core::types::BrokerId;
 use tracing::{info, warn};
 
@@ -31,18 +31,10 @@ use crate::replica::PartitionReplicaSet;
 // ─── 选举配置 ────────────────────────────────────────────────────────
 
 /// Leader 选举配置
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ElectionConfig {
     /// 是否允许 unclean leader election (ISR 为空时从非 ISR 中选)
     pub unclean_leader_election_enabled: bool,
-}
-
-impl Default for ElectionConfig {
-    fn default() -> Self {
-        Self {
-            unclean_leader_election_enabled: false,
-        }
-    }
 }
 
 // ─── 选举结果 ────────────────────────────────────────────────────────
@@ -232,10 +224,7 @@ impl LeaderElector {
     /// 检查是否应该执行 preferred leader election
     ///
     /// 条件: preferred leader 在 ISR 中，且当前 leader 不是 preferred
-    pub fn should_do_preferred_election(
-        &self,
-        replica_set: &PartitionReplicaSet,
-    ) -> bool {
+    pub fn should_do_preferred_election(&self, replica_set: &PartitionReplicaSet) -> bool {
         if let Some(preferred) = replica_set.preferred_leader() {
             replica_set.is_in_isr(preferred) && !replica_set.is_preferred_leader()
         } else {
@@ -360,7 +349,10 @@ mod tests {
 
         let result = elector.elect_leader(&prs, 0, &alive);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ElectionFailure::IsrEmptyUncleanDisabled));
+        assert!(matches!(
+            result.unwrap_err(),
+            ElectionFailure::IsrEmptyUncleanDisabled
+        ));
     }
 
     #[test]

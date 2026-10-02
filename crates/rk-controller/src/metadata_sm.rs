@@ -119,7 +119,8 @@ impl MetadataStateMachine {
     /// 从快照恢复状态机
     pub fn from_snapshot(snapshot: MetadataSnapshot) -> Self {
         let sm = Self::new();
-        sm.last_applied.store(snapshot.last_applied_log, Ordering::SeqCst);
+        sm.last_applied
+            .store(snapshot.last_applied_log, Ordering::SeqCst);
 
         for (name, meta) in snapshot.topics {
             sm.topics.insert(name, meta);
@@ -157,7 +158,13 @@ impl MetadataStateMachine {
                 replication_factor,
                 configs,
             } => {
-                self.apply_create_topic(topic_name, *topic_id, *partitions, *replication_factor, configs);
+                self.apply_create_topic(
+                    topic_name,
+                    *topic_id,
+                    *partitions,
+                    *replication_factor,
+                    configs,
+                );
             }
             LogEntry::DeleteTopic { topic_name } => {
                 self.apply_delete_topic(topic_name);
@@ -300,12 +307,7 @@ impl MetadataStateMachine {
         }
     }
 
-    fn apply_assign_partition(
-        &self,
-        topic_name: &str,
-        partition_id: i32,
-        replicas: &[i32],
-    ) {
+    fn apply_assign_partition(&self, topic_name: &str, partition_id: i32, replicas: &[i32]) {
         let key = format!("{}:{}", topic_name, partition_id);
 
         let meta = if let Some(existing) = self.partitions.get(&key) {
@@ -356,13 +358,7 @@ impl MetadataStateMachine {
         self.partitions.insert(key, meta);
     }
 
-    fn apply_register_broker(
-        &self,
-        broker_id: i32,
-        rack: Option<String>,
-        host: String,
-        port: u16,
-    ) {
+    fn apply_register_broker(&self, broker_id: i32, rack: Option<String>, host: String, port: u16) {
         info!(broker_id = broker_id, host = %host, port = port, "Broker registered");
 
         let meta = BrokerMetadata {
@@ -379,17 +375,14 @@ impl MetadataStateMachine {
     fn apply_unregister_broker(&self, broker_id: i32) {
         if let Some(mut meta) = self.brokers.get_mut(&broker_id) {
             meta.is_alive = false;
-            info!(broker_id = broker_id, "Broker unregistered (marked offline)");
+            info!(
+                broker_id = broker_id,
+                "Broker unregistered (marked offline)"
+            );
         }
     }
 
-    fn apply_set_config(
-        &self,
-        resource_type: &str,
-        resource_name: &str,
-        key: &str,
-        value: &str,
-    ) {
+    fn apply_set_config(&self, resource_type: &str, resource_name: &str, key: &str, value: &str) {
         let config_key = format!("{}:{}:{}", resource_type, resource_name, key);
         self.configs.insert(config_key, value.to_string());
     }
@@ -452,7 +445,12 @@ impl MetadataStateMachine {
     }
 
     /// 获取配置值
-    pub fn get_config(&self, resource_type: &str, resource_name: &str, key: &str) -> Option<String> {
+    pub fn get_config(
+        &self,
+        resource_type: &str,
+        resource_name: &str,
+        key: &str,
+    ) -> Option<String> {
         let config_key = format!("{}:{}:{}", resource_type, resource_name, key);
         self.configs.get(&config_key).map(|r| r.value().clone())
     }
@@ -494,13 +492,16 @@ mod tests {
     fn test_sm_apply_create_topic() {
         let sm = MetadataStateMachine::new();
 
-        sm.apply(1, &LogEntry::CreateTopic {
-            topic_name: "test-topic".to_string(),
-            topic_id: 42,
-            partitions: 3,
-            replication_factor: 2,
-            configs: vec![("retention.ms".to_string(), "86400000".to_string())],
-        });
+        sm.apply(
+            1,
+            &LogEntry::CreateTopic {
+                topic_name: "test-topic".to_string(),
+                topic_id: 42,
+                partitions: 3,
+                replication_factor: 2,
+                configs: vec![("retention.ms".to_string(), "86400000".to_string())],
+            },
+        );
 
         assert_eq!(sm.last_applied(), 1);
         assert_eq!(sm.topic_count(), 1);
@@ -518,25 +519,34 @@ mod tests {
     fn test_sm_apply_delete_topic() {
         let sm = MetadataStateMachine::new();
 
-        sm.apply(1, &LogEntry::CreateTopic {
-            topic_name: "to-delete".to_string(),
-            topic_id: 1,
-            partitions: 1,
-            replication_factor: 1,
-            configs: vec![],
-        });
+        sm.apply(
+            1,
+            &LogEntry::CreateTopic {
+                topic_name: "to-delete".to_string(),
+                topic_id: 1,
+                partitions: 1,
+                replication_factor: 1,
+                configs: vec![],
+            },
+        );
 
-        sm.apply(2, &LogEntry::AssignPartition {
-            topic_name: "to-delete".to_string(),
-            partition_id: 0,
-            replicas: vec![1],
-        });
+        sm.apply(
+            2,
+            &LogEntry::AssignPartition {
+                topic_name: "to-delete".to_string(),
+                partition_id: 0,
+                replicas: vec![1],
+            },
+        );
 
         assert_eq!(sm.get_topic_partitions("to-delete").len(), 1);
 
-        sm.apply(3, &LogEntry::DeleteTopic {
-            topic_name: "to-delete".to_string(),
-        });
+        sm.apply(
+            3,
+            &LogEntry::DeleteTopic {
+                topic_name: "to-delete".to_string(),
+            },
+        );
 
         let topic = sm.get_topic("to-delete").unwrap();
         assert!(topic.marked_for_deletion);
@@ -547,25 +557,34 @@ mod tests {
     fn test_sm_apply_assign_partition() {
         let sm = MetadataStateMachine::new();
 
-        sm.apply(1, &LogEntry::CreateTopic {
-            topic_name: "test".to_string(),
-            topic_id: 1,
-            partitions: 3,
-            replication_factor: 2,
-            configs: vec![],
-        });
+        sm.apply(
+            1,
+            &LogEntry::CreateTopic {
+                topic_name: "test".to_string(),
+                topic_id: 1,
+                partitions: 3,
+                replication_factor: 2,
+                configs: vec![],
+            },
+        );
 
-        sm.apply(2, &LogEntry::AssignPartition {
-            topic_name: "test".to_string(),
-            partition_id: 0,
-            replicas: vec![1, 2],
-        });
+        sm.apply(
+            2,
+            &LogEntry::AssignPartition {
+                topic_name: "test".to_string(),
+                partition_id: 0,
+                replicas: vec![1, 2],
+            },
+        );
 
-        sm.apply(3, &LogEntry::AssignPartition {
-            topic_name: "test".to_string(),
-            partition_id: 1,
-            replicas: vec![2, 3],
-        });
+        sm.apply(
+            3,
+            &LogEntry::AssignPartition {
+                topic_name: "test".to_string(),
+                partition_id: 1,
+                replicas: vec![2, 3],
+            },
+        );
 
         let p0 = sm.get_partition("test", 0).unwrap();
         assert_eq!(p0.replicas, vec![1, 2]);
@@ -583,19 +602,25 @@ mod tests {
     fn test_sm_apply_update_leader_and_isr() {
         let sm = MetadataStateMachine::new();
 
-        sm.apply(1, &LogEntry::AssignPartition {
-            topic_name: "test".to_string(),
-            partition_id: 0,
-            replicas: vec![1, 2, 3],
-        });
+        sm.apply(
+            1,
+            &LogEntry::AssignPartition {
+                topic_name: "test".to_string(),
+                partition_id: 0,
+                replicas: vec![1, 2, 3],
+            },
+        );
 
-        sm.apply(2, &LogEntry::UpdateLeaderAndIsr {
-            topic_name: "test".to_string(),
-            partition_id: 0,
-            leader: 2,
-            epoch: 5,
-            isr: vec![2, 3],
-        });
+        sm.apply(
+            2,
+            &LogEntry::UpdateLeaderAndIsr {
+                topic_name: "test".to_string(),
+                partition_id: 0,
+                leader: 2,
+                epoch: 5,
+                isr: vec![2, 3],
+            },
+        );
 
         let p = sm.get_partition("test", 0).unwrap();
         assert_eq!(p.leader, Some(2));
@@ -607,19 +632,25 @@ mod tests {
     fn test_sm_apply_register_broker() {
         let sm = MetadataStateMachine::new();
 
-        sm.apply(1, &LogEntry::RegisterBroker {
-            broker_id: 1,
-            rack: Some("rack-a".to_string()),
-            host: "192.168.1.1".to_string(),
-            port: 9092,
-        });
+        sm.apply(
+            1,
+            &LogEntry::RegisterBroker {
+                broker_id: 1,
+                rack: Some("rack-a".to_string()),
+                host: "192.168.1.1".to_string(),
+                port: 9092,
+            },
+        );
 
-        sm.apply(2, &LogEntry::RegisterBroker {
-            broker_id: 2,
-            rack: Some("rack-b".to_string()),
-            host: "192.168.1.2".to_string(),
-            port: 9092,
-        });
+        sm.apply(
+            2,
+            &LogEntry::RegisterBroker {
+                broker_id: 2,
+                rack: Some("rack-b".to_string()),
+                host: "192.168.1.2".to_string(),
+                port: 9092,
+            },
+        );
 
         assert_eq!(sm.broker_count(), 2);
 
@@ -636,12 +667,15 @@ mod tests {
     fn test_sm_apply_unregister_broker() {
         let sm = MetadataStateMachine::new();
 
-        sm.apply(1, &LogEntry::RegisterBroker {
-            broker_id: 1,
-            rack: None,
-            host: "127.0.0.1".to_string(),
-            port: 9092,
-        });
+        sm.apply(
+            1,
+            &LogEntry::RegisterBroker {
+                broker_id: 1,
+                rack: None,
+                host: "127.0.0.1".to_string(),
+                port: 9092,
+            },
+        );
 
         sm.apply(2, &LogEntry::UnregisterBroker { broker_id: 1 });
 
@@ -656,12 +690,15 @@ mod tests {
     fn test_sm_apply_set_config() {
         let sm = MetadataStateMachine::new();
 
-        sm.apply(1, &LogEntry::SetConfig {
-            resource_type: "topic".to_string(),
-            resource_name: "my-topic".to_string(),
-            key: "retention.ms".to_string(),
-            value: "604800000".to_string(),
-        });
+        sm.apply(
+            1,
+            &LogEntry::SetConfig {
+                resource_type: "topic".to_string(),
+                resource_name: "my-topic".to_string(),
+                key: "retention.ms".to_string(),
+                value: "604800000".to_string(),
+            },
+        );
 
         let value = sm.get_config("topic", "my-topic", "retention.ms");
         assert_eq!(value, Some("604800000".to_string()));
@@ -671,10 +708,13 @@ mod tests {
     fn test_sm_apply_update_feature() {
         let sm = MetadataStateMachine::new();
 
-        sm.apply(1, &LogEntry::UpdateFeature {
-            name: "metadata.version".to_string(),
-            version: 17,
-        });
+        sm.apply(
+            1,
+            &LogEntry::UpdateFeature {
+                name: "metadata.version".to_string(),
+                version: 17,
+            },
+        );
 
         let value = sm.get_config("feature", "metadata.version", "version");
         assert_eq!(value, Some("17".to_string()));
@@ -692,26 +732,35 @@ mod tests {
     fn test_sm_snapshot_and_restore() {
         let sm = MetadataStateMachine::new();
 
-        sm.apply(1, &LogEntry::RegisterBroker {
-            broker_id: 1,
-            rack: None,
-            host: "127.0.0.1".to_string(),
-            port: 9092,
-        });
+        sm.apply(
+            1,
+            &LogEntry::RegisterBroker {
+                broker_id: 1,
+                rack: None,
+                host: "127.0.0.1".to_string(),
+                port: 9092,
+            },
+        );
 
-        sm.apply(2, &LogEntry::CreateTopic {
-            topic_name: "test".to_string(),
-            topic_id: 42,
-            partitions: 3,
-            replication_factor: 2,
-            configs: vec![],
-        });
+        sm.apply(
+            2,
+            &LogEntry::CreateTopic {
+                topic_name: "test".to_string(),
+                topic_id: 42,
+                partitions: 3,
+                replication_factor: 2,
+                configs: vec![],
+            },
+        );
 
-        sm.apply(3, &LogEntry::AssignPartition {
-            topic_name: "test".to_string(),
-            partition_id: 0,
-            replicas: vec![1, 2],
-        });
+        sm.apply(
+            3,
+            &LogEntry::AssignPartition {
+                topic_name: "test".to_string(),
+                partition_id: 0,
+                replicas: vec![1, 2],
+            },
+        );
 
         let snapshot = sm.snapshot();
         assert_eq!(snapshot.last_applied_log, 3);
@@ -733,22 +782,28 @@ mod tests {
     fn test_sm_duplicate_create_topic() {
         let sm = MetadataStateMachine::new();
 
-        sm.apply(1, &LogEntry::CreateTopic {
-            topic_name: "dup".to_string(),
-            topic_id: 1,
-            partitions: 1,
-            replication_factor: 1,
-            configs: vec![],
-        });
+        sm.apply(
+            1,
+            &LogEntry::CreateTopic {
+                topic_name: "dup".to_string(),
+                topic_id: 1,
+                partitions: 1,
+                replication_factor: 1,
+                configs: vec![],
+            },
+        );
 
         // 重复创建应该被忽略
-        sm.apply(2, &LogEntry::CreateTopic {
-            topic_name: "dup".to_string(),
-            topic_id: 2,
-            partitions: 3,
-            replication_factor: 2,
-            configs: vec![],
-        });
+        sm.apply(
+            2,
+            &LogEntry::CreateTopic {
+                topic_name: "dup".to_string(),
+                topic_id: 2,
+                partitions: 3,
+                replication_factor: 2,
+                configs: vec![],
+            },
+        );
 
         assert_eq!(sm.topic_count(), 1);
         let topic = sm.get_topic("dup").unwrap();

@@ -19,6 +19,12 @@ pub struct InitProducerIdHandler {
     fallback_next_id: std::sync::atomic::AtomicI64,
 }
 
+impl Default for InitProducerIdHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InitProducerIdHandler {
     pub fn new() -> Self {
         Self {
@@ -97,7 +103,8 @@ impl InitProducerIdHandler {
         let producer_id = if request.producer_id >= 0 {
             request.producer_id
         } else {
-            self.fallback_next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            self.fallback_next_id
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
         };
 
         let producer_epoch = if request.producer_epoch >= 0 {

@@ -19,15 +19,13 @@ pub struct EndTxnHandler {
 
 impl EndTxnHandler {
     pub fn new(producer_state_manager: Arc<ProducerStateManager>) -> Self {
-        Self { producer_state_manager }
+        Self {
+            producer_state_manager,
+        }
     }
 
     /// 处理 EndTxn 请求
-    pub fn handle(
-        &self,
-        request: EndTxnRequest,
-        _version: i16,
-    ) -> Result<EndTxnResponse> {
+    pub fn handle(&self, request: EndTxnRequest, _version: i16) -> Result<EndTxnResponse> {
         debug!(
             transactional_id = %request.transactional_id,
             producer_id = request.producer_id,
@@ -37,7 +35,10 @@ impl EndTxnHandler {
         );
 
         // 验证 producer_id 存在
-        let state = match self.producer_state_manager.get_producer_state(request.producer_id) {
+        let state = match self
+            .producer_state_manager
+            .get_producer_state(request.producer_id)
+        {
             Some(s) => s,
             None => {
                 return Ok(EndTxnResponse {
@@ -65,9 +66,11 @@ impl EndTxnHandler {
 
         // 提交或中止
         let result = if request.committed {
-            self.producer_state_manager.commit_transaction(request.producer_id)
+            self.producer_state_manager
+                .commit_transaction(request.producer_id)
         } else {
-            self.producer_state_manager.abort_transaction(request.producer_id)
+            self.producer_state_manager
+                .abort_transaction(request.producer_id)
         };
 
         let error_code = match result {

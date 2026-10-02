@@ -85,7 +85,11 @@ impl FetchHandler {
             });
         }
 
-        debug!("Fetch handled: {} topics, {} bytes", response_topics.len(), total_bytes);
+        debug!(
+            "Fetch handled: {} topics, {} bytes",
+            response_topics.len(),
+            total_bytes
+        );
 
         Ok(FetchResponse {
             throttle_time_ms: 0,
@@ -111,9 +115,13 @@ impl FetchHandler {
         let _ = self.partition_manager.ensure_partition(topic, partition);
 
         // 获取 HW 和 LEO
-        let hw = self.partition_manager.high_watermark(topic, partition)
+        let hw = self
+            .partition_manager
+            .high_watermark(topic, partition)
             .unwrap_or(Offset(0));
-        let leo = self.partition_manager.log_end_offset(topic, partition)
+        let leo = self
+            .partition_manager
+            .log_end_offset(topic, partition)
             .unwrap_or(Offset(0));
 
         // 如果 fetch_offset 超出范围
@@ -122,10 +130,7 @@ impl FetchHandler {
         }
 
         // 计算读取字节限制
-        let max_bytes = std::cmp::min(
-            partition_max_bytes as usize,
-            global_max_bytes,
-        );
+        let max_bytes = std::cmp::min(partition_max_bytes as usize, global_max_bytes);
 
         // 从 PartitionManager 读取 batches
         let batches = self.partition_manager.read_batches(
@@ -152,9 +157,7 @@ impl FetchHandler {
 
 fn error_from_fetch_error(err: &rk_core::error::RkError) -> KafkaErrorCode {
     match err {
-        rk_core::error::RkError::LogDirNotFound(_) => {
-            KafkaErrorCode::UnknownTopicOrPartition
-        }
+        rk_core::error::RkError::LogDirNotFound(_) => KafkaErrorCode::UnknownTopicOrPartition,
         rk_core::error::RkError::Protocol(_) => KafkaErrorCode::CorruptMessage,
         _ => KafkaErrorCode::UnknownServerError,
     }
@@ -168,14 +171,27 @@ mod tests {
 
     fn make_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10];
-        build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+        build_batch_bytes(
+            base_offset,
+            1,
+            0,
+            1000,
+            2000,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
+        )
     }
 
     fn make_handler_with_data() -> FetchHandler {
         let dir = tempdir().unwrap();
-        let pm = std::sync::Arc::new(
-            PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1)
-        );
+        let pm = std::sync::Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
 
         // 写入测试数据
         pm.get_or_create_topic("test-topic", 1);
@@ -213,7 +229,10 @@ mod tests {
         let response = handler.handle(request, 0).unwrap();
         assert_eq!(response.topics.len(), 1);
         assert_eq!(response.topics[0].partitions.len(), 1);
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         assert!(!response.topics[0].partitions[0].record_set.is_empty());
     }
 
@@ -302,7 +321,10 @@ mod tests {
 
         let response = handler.handle(request, 0).unwrap();
         // 自动创建 topic，但无数据
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         assert!(response.topics[0].partitions[0].record_set.is_empty());
     }
 }

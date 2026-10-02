@@ -20,7 +20,7 @@ use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
 use memmap2::MmapMut;
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 
 // ─── 索引条目大小 ──────────────────────────────────────────────────
 
@@ -99,10 +99,16 @@ impl OffsetIndex {
             }
             // 检查是否全零 (relative_offset == 0 && physical_position == 0 视为空)
             let relative_offset = u32::from_be_bytes([
-                mmap[offset], mmap[offset + 1], mmap[offset + 2], mmap[offset + 3],
+                mmap[offset],
+                mmap[offset + 1],
+                mmap[offset + 2],
+                mmap[offset + 3],
             ]);
             let physical_position = u32::from_be_bytes([
-                mmap[offset + 4], mmap[offset + 5], mmap[offset + 6], mmap[offset + 7],
+                mmap[offset + 4],
+                mmap[offset + 5],
+                mmap[offset + 6],
+                mmap[offset + 7],
             ]);
             // 第一条 entry 可以是 (0, 0)，需要特殊处理:
             // 如果 i == 0 且两个字段都是 0，可能是有效条目也可能是空
@@ -118,12 +124,16 @@ impl OffsetIndex {
                 let next_offset = OFFSET_INDEX_ENTRY_SIZE;
                 if next_offset + OFFSET_INDEX_ENTRY_SIZE <= mmap.len() {
                     let next_rel = u32::from_be_bytes([
-                        mmap[next_offset], mmap[next_offset + 1],
-                        mmap[next_offset + 2], mmap[next_offset + 3],
+                        mmap[next_offset],
+                        mmap[next_offset + 1],
+                        mmap[next_offset + 2],
+                        mmap[next_offset + 3],
                     ]);
                     let next_pos = u32::from_be_bytes([
-                        mmap[next_offset + 4], mmap[next_offset + 5],
-                        mmap[next_offset + 6], mmap[next_offset + 7],
+                        mmap[next_offset + 4],
+                        mmap[next_offset + 5],
+                        mmap[next_offset + 6],
+                        mmap[next_offset + 7],
                     ]);
                     if next_rel == 0 && next_pos == 0 {
                         return 0; // 空索引
@@ -280,8 +290,14 @@ impl TimeIndex {
                 return i;
             }
             let timestamp = i64::from_be_bytes([
-                mmap[offset], mmap[offset + 1], mmap[offset + 2], mmap[offset + 3],
-                mmap[offset + 4], mmap[offset + 5], mmap[offset + 6], mmap[offset + 7],
+                mmap[offset],
+                mmap[offset + 1],
+                mmap[offset + 2],
+                mmap[offset + 3],
+                mmap[offset + 4],
+                mmap[offset + 5],
+                mmap[offset + 6],
+                mmap[offset + 7],
             ]);
             if timestamp == 0 {
                 return i;

@@ -86,7 +86,11 @@ mod tests {
 
     fn make_handler() -> OffsetForLeaderEpochHandler {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test", 3);
         // 写入一些数据
         let records = vec![0u8; 50];
@@ -111,7 +115,10 @@ mod tests {
         };
         let resp = handler.handle(req, 0).unwrap();
         assert_eq!(resp.topics.len(), 1);
-        assert_eq!(resp.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            resp.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         assert_eq!(resp.topics[0].partitions[0].end_offset, 5);
     }
 
@@ -130,6 +137,9 @@ mod tests {
             }],
         };
         let resp = handler.handle(req, 0).unwrap();
-        assert_eq!(resp.topics[0].partitions[0].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            resp.topics[0].partitions[0].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 }

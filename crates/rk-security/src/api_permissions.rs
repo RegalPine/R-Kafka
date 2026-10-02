@@ -334,7 +334,7 @@ pub fn api_permission(api_key: i16) -> Option<ApiPermission> {
         }),
 
         // Vote (51), BeginQuorumEpoch (52), EndQuorumEpoch (53) — ClusterAction
-        51 | 52 | 53 => Some(ApiPermission {
+        51..=53 => Some(ApiPermission {
             resource_type: ResourceType::Cluster,
             operation: AclOperation::ClusterAction,
             needs_resource_name: false,

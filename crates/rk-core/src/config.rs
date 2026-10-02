@@ -38,6 +38,65 @@ impl BrokerConfig {
         let content = std::fs::read_to_string(path)?;
         Self::from_toml(&content)
     }
+
+    /// 从环境变量覆盖配置 (12-Factor 兼容)
+    ///
+    /// 环境变量命名规则: `RK_{SECTION}_{KEY}` (大写)
+    /// 优先级: 环境变量 > 配置文件 > 默认值
+    ///
+    /// 支持的环境变量:
+    /// - `RK_BROKER_ID` — Broker ID
+    /// - `RK_BROKER_HOST` — 监听地址
+    /// - `RK_BROKER_PORT` — 监听端口
+    /// - `RK_BROKER_RACK` — 机架 ID
+    /// - `RK_STORAGE_DATA_DIR` — 数据目录
+    /// - `RK_STORAGE_FLUSH_MODE` — 刷盘模式
+    /// - `RK_STORAGE_IO_ENGINE` — I/O 引擎
+    /// - `RK_OBSERVABILITY_METRICS_ENABLED` — 指标开关 (true/false)
+    /// - `RK_OBSERVABILITY_METRICS_PORT` — 指标端口
+    /// - `RK_OBSERVABILITY_TRACING_ENABLED` — 追踪开关
+    /// - `RK_OBSERVABILITY_TRACING_ENDPOINT` — OTLP endpoint
+    pub fn apply_env_overrides(&mut self) {
+        if let Ok(v) = std::env::var("RK_BROKER_ID") {
+            if let Ok(id) = v.parse::<i32>() {
+                self.broker.id = id;
+            }
+        }
+        if let Ok(v) = std::env::var("RK_BROKER_HOST") {
+            self.broker.host = v;
+        }
+        if let Ok(v) = std::env::var("RK_BROKER_PORT") {
+            if let Ok(port) = v.parse::<u16>() {
+                self.broker.port = port;
+            }
+        }
+        if let Ok(v) = std::env::var("RK_BROKER_RACK") {
+            self.broker.rack = Some(v);
+        }
+        if let Ok(v) = std::env::var("RK_STORAGE_DATA_DIR") {
+            self.storage.data_dir = v;
+        }
+        if let Ok(v) = std::env::var("RK_STORAGE_FLUSH_MODE") {
+            self.storage.flush_mode = v;
+        }
+        if let Ok(v) = std::env::var("RK_STORAGE_IO_ENGINE") {
+            self.storage.io_engine = v;
+        }
+        if let Ok(v) = std::env::var("RK_OBSERVABILITY_METRICS_ENABLED") {
+            self.observability.metrics_enabled = v.eq_ignore_ascii_case("true") || v == "1";
+        }
+        if let Ok(v) = std::env::var("RK_OBSERVABILITY_METRICS_PORT") {
+            if let Ok(port) = v.parse::<u16>() {
+                self.observability.metrics_port = port;
+            }
+        }
+        if let Ok(v) = std::env::var("RK_OBSERVABILITY_TRACING_ENABLED") {
+            self.observability.tracing_enabled = v.eq_ignore_ascii_case("true") || v == "1";
+        }
+        if let Ok(v) = std::env::var("RK_OBSERVABILITY_TRACING_ENDPOINT") {
+            self.observability.tracing_endpoint = Some(v);
+        }
+    }
 }
 
 /// [broker] 段
@@ -292,29 +351,75 @@ impl Default for ProducerSection {
     }
 }
 
-fn default_broker_id() -> i32 { 1 }
-fn default_host() -> String { "0.0.0.0".to_string() }
-fn default_port() -> u16 { 9092 }
-fn default_data_dir() -> String { "/data/r-kafka".to_string() }
-fn default_segment_max_size() -> u64 { 1_073_741_824 } // 1GB
-fn default_segment_max_time_ms() -> u64 { 1_800_000 } // 30min
-fn default_flush_interval_ms() -> u64 { 5 }
-fn default_flush_mode() -> String { "hybrid".to_string() }
-fn default_io_engine() -> String { "stdio".to_string() }
-fn default_retention_max_bytes() -> u64 { 1_099_511_627_776 } // 1TB
-fn default_retention_max_ms() -> u64 { 604_800_000 } // 7 days
-fn default_replication_factor() -> i32 { 3 }
-fn default_min_isr() -> i32 { 2 }
-fn default_replica_lag_ms() -> u64 { 10_000 }
-fn default_max_connections() -> usize { 100_000 }
-fn default_max_request_size() -> usize { 104_857_600 } // 100MB
-fn default_max_pending_bytes() -> usize { 536_870_912 } // 512MB
-fn default_tls_mode() -> String { "one-way".to_string() }
-fn default_election_timeout_ms() -> u64 { 3000 }
-fn default_metrics_port() -> u16 { 9090 }
-fn default_tracing_layer() -> String { "fmt".to_string() }
-fn default_batch_size() -> usize { 1_048_576 } // 1MB
-fn default_linger_ms() -> u64 { 5 }
+fn default_broker_id() -> i32 {
+    1
+}
+fn default_host() -> String {
+    "0.0.0.0".to_string()
+}
+fn default_port() -> u16 {
+    9092
+}
+fn default_data_dir() -> String {
+    "/data/r-kafka".to_string()
+}
+fn default_segment_max_size() -> u64 {
+    1_073_741_824
+} // 1GB
+fn default_segment_max_time_ms() -> u64 {
+    1_800_000
+} // 30min
+fn default_flush_interval_ms() -> u64 {
+    5
+}
+fn default_flush_mode() -> String {
+    "hybrid".to_string()
+}
+fn default_io_engine() -> String {
+    "stdio".to_string()
+}
+fn default_retention_max_bytes() -> u64 {
+    1_099_511_627_776
+} // 1TB
+fn default_retention_max_ms() -> u64 {
+    604_800_000
+} // 7 days
+fn default_replication_factor() -> i32 {
+    3
+}
+fn default_min_isr() -> i32 {
+    2
+}
+fn default_replica_lag_ms() -> u64 {
+    10_000
+}
+fn default_max_connections() -> usize {
+    100_000
+}
+fn default_max_request_size() -> usize {
+    104_857_600
+} // 100MB
+fn default_max_pending_bytes() -> usize {
+    536_870_912
+} // 512MB
+fn default_tls_mode() -> String {
+    "one-way".to_string()
+}
+fn default_election_timeout_ms() -> u64 {
+    3000
+}
+fn default_metrics_port() -> u16 {
+    9090
+}
+fn default_tracing_layer() -> String {
+    "fmt".to_string()
+}
+fn default_batch_size() -> usize {
+    1_048_576
+} // 1MB
+fn default_linger_ms() -> u64 {
+    5
+}
 
 #[cfg(test)]
 mod tests {

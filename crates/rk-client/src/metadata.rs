@@ -88,7 +88,10 @@ impl MetadataCache {
         for b in brokers {
             self.brokers.insert(b.broker_id, b);
         }
-        debug!(broker_count = self.brokers.len(), "Metadata cache: brokers updated");
+        debug!(
+            broker_count = self.brokers.len(),
+            "Metadata cache: brokers updated"
+        );
     }
 
     /// 更新 Partition Leader
@@ -194,8 +197,18 @@ mod tests {
     fn test_update_brokers() {
         let mut cache = MetadataCache::new(Duration::from_secs(60));
         cache.update_brokers(vec![
-            BrokerEndpoint { broker_id: 1, host: "h1".to_string(), port: 9092, rack: None },
-            BrokerEndpoint { broker_id: 2, host: "h2".to_string(), port: 9092, rack: None },
+            BrokerEndpoint {
+                broker_id: 1,
+                host: "h1".to_string(),
+                port: 9092,
+                rack: None,
+            },
+            BrokerEndpoint {
+                broker_id: 2,
+                host: "h2".to_string(),
+                port: 9092,
+                rack: None,
+            },
         ]);
         assert_eq!(cache.broker_count(), 2);
         assert!(cache.get_broker(1).is_some());
@@ -235,9 +248,12 @@ mod tests {
     #[test]
     fn test_clear() {
         let mut cache = MetadataCache::new(Duration::from_secs(60));
-        cache.update_brokers(vec![
-            BrokerEndpoint { broker_id: 1, host: "h1".to_string(), port: 9092, rack: None },
-        ]);
+        cache.update_brokers(vec![BrokerEndpoint {
+            broker_id: 1,
+            host: "h1".to_string(),
+            port: 9092,
+            rack: None,
+        }]);
         cache.update_topic_partitions("test", 3);
         assert_eq!(cache.broker_count(), 1);
         assert_eq!(cache.topic_count(), 1);

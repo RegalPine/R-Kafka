@@ -3,10 +3,10 @@
 //! 实现 MetadataRequest / MetadataResponse，支持 v0-v13。
 //! v12+ 新增 NodeEndpoints 数组 (KRaft 模式节点端点)。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ─────────────────────────────────────────────────────────
 

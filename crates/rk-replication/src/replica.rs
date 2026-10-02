@@ -9,7 +9,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use rk_core::types::{BrokerId, Offset, PartitionId, TopicName};
 use serde::{Deserialize, Serialize};
 
@@ -132,12 +132,7 @@ impl ReplicaInfo {
     }
 
     /// 更新 Follower 的复制进度
-    pub fn update_fetch_progress(
-        &mut self,
-        leo: Offset,
-        hw: Offset,
-        leader_epoch: i32,
-    ) {
+    pub fn update_fetch_progress(&mut self, leo: Offset, hw: Offset, leader_epoch: i32) {
         self.log_end_offset = leo;
         self.high_watermark = hw;
         self.last_fetch_offset = leo;
@@ -424,12 +419,8 @@ mod tests {
     #[test]
     fn test_partition_replica_set_new() {
         let assignment = vec![broker(1), broker(2), broker(3)];
-        let prs = PartitionReplicaSet::new(
-            topic("test"),
-            partition(0),
-            broker(1),
-            assignment.clone(),
-        );
+        let prs =
+            PartitionReplicaSet::new(topic("test"), partition(0), broker(1), assignment.clone());
 
         assert_eq!(prs.leader_id, broker(1));
         assert_eq!(prs.leader_epoch, 0);
@@ -447,12 +438,7 @@ mod tests {
     #[test]
     fn test_partition_replica_set_add_remove_follower() {
         let assignment = vec![broker(1), broker(2)];
-        let mut prs = PartitionReplicaSet::new(
-            topic("test"),
-            partition(0),
-            broker(1),
-            assignment,
-        );
+        let mut prs = PartitionReplicaSet::new(topic("test"), partition(0), broker(1), assignment);
 
         // 添加 follower
         prs.add_follower(broker(3)).unwrap();
@@ -473,12 +459,7 @@ mod tests {
     #[test]
     fn test_partition_replica_set_hw_computation() {
         let assignment = vec![broker(1), broker(2), broker(3)];
-        let mut prs = PartitionReplicaSet::new(
-            topic("test"),
-            partition(0),
-            broker(1),
-            assignment,
-        );
+        let mut prs = PartitionReplicaSet::new(topic("test"), partition(0), broker(1), assignment);
 
         // Leader LEO = 100
         prs.update_leader_offsets(Offset(100), Offset(0));
@@ -511,12 +492,7 @@ mod tests {
     #[test]
     fn test_partition_replica_set_min_isr_leo() {
         let assignment = vec![broker(1), broker(2)];
-        let mut prs = PartitionReplicaSet::new(
-            topic("test"),
-            partition(0),
-            broker(1),
-            assignment,
-        );
+        let mut prs = PartitionReplicaSet::new(topic("test"), partition(0), broker(1), assignment);
 
         prs.update_leader_offsets(Offset(100), Offset(0));
         prs.replicas.get_mut(&broker(2)).unwrap().log_end_offset = Offset(75);
@@ -531,12 +507,7 @@ mod tests {
     #[test]
     fn test_partition_replica_set_follower_broker_ids() {
         let assignment = vec![broker(1), broker(2), broker(3)];
-        let prs = PartitionReplicaSet::new(
-            topic("test"),
-            partition(0),
-            broker(1),
-            assignment,
-        );
+        let prs = PartitionReplicaSet::new(topic("test"), partition(0), broker(1), assignment);
 
         let followers = prs.follower_broker_ids();
         assert_eq!(followers.len(), 2);

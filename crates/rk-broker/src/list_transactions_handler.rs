@@ -19,7 +19,9 @@ pub struct ListTransactionsHandler {
 
 impl ListTransactionsHandler {
     pub fn new(producer_state_manager: Arc<ProducerStateManager>) -> Self {
-        Self { producer_state_manager }
+        Self {
+            producer_state_manager,
+        }
     }
 
     /// 处理 ListTransactions 请求
@@ -41,7 +43,9 @@ impl ListTransactionsHandler {
         for txn_info in all_txns {
             // 按 transactional_id 前缀过滤
             if !request.transactional_id_prefixes.is_empty() {
-                let matches = request.transactional_id_prefixes.iter()
+                let matches = request
+                    .transactional_id_prefixes
+                    .iter()
                     .any(|prefix| txn_info.transactional_id.starts_with(prefix));
                 if !matches {
                     continue;
@@ -49,10 +53,10 @@ impl ListTransactionsHandler {
             }
 
             // 按状态过滤
-            if !request.states.is_empty() {
-                if !request.states.contains(&txn_info.state_str) {
-                    continue;
-                }
+            if !request.states.is_empty()
+                && !request.states.contains(&txn_info.state_str)
+            {
+                continue;
             }
 
             transaction_states.push(ListTransactionsResponseState {

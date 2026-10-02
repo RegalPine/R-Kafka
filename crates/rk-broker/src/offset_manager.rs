@@ -176,7 +176,8 @@ impl OffsetManager {
 
     /// 获取指定 (group, topic, partition) 的偏移量 (别名)
     pub fn get_offset(&self, group_id: &str, topic: &str, partition: i32) -> Option<i64> {
-        self.fetch_offset(group_id, topic, partition).map(|co| co.offset)
+        self.fetch_offset(group_id, topic, partition)
+            .map(|co| co.offset)
     }
 }
 
@@ -196,7 +197,8 @@ mod tests {
     fn test_offset_manager_commit_and_fetch() {
         let om = OffsetManager::new(None);
 
-        om.commit_offset("group-1", "topic-a", 0, 42, -1, None).unwrap();
+        om.commit_offset("group-1", "topic-a", 0, 42, -1, None)
+            .unwrap();
 
         let offset = om.fetch_offset("group-1", "topic-a", 0).unwrap();
         assert_eq!(offset.offset, 42);
@@ -208,8 +210,10 @@ mod tests {
     fn test_offset_manager_overwrite() {
         let om = OffsetManager::new(None);
 
-        om.commit_offset("group-1", "topic-a", 0, 10, -1, None).unwrap();
-        om.commit_offset("group-1", "topic-a", 0, 20, -1, Some("meta".to_string())).unwrap();
+        om.commit_offset("group-1", "topic-a", 0, 10, -1, None)
+            .unwrap();
+        om.commit_offset("group-1", "topic-a", 0, 20, -1, Some("meta".to_string()))
+            .unwrap();
 
         let offset = om.fetch_offset("group-1", "topic-a", 0).unwrap();
         assert_eq!(offset.offset, 20);
@@ -226,9 +230,12 @@ mod tests {
     fn test_offset_manager_fetch_for_topic() {
         let om = OffsetManager::new(None);
 
-        om.commit_offset("group-1", "topic-a", 0, 10, -1, None).unwrap();
-        om.commit_offset("group-1", "topic-a", 1, 20, -1, None).unwrap();
-        om.commit_offset("group-1", "topic-b", 0, 30, -1, None).unwrap();
+        om.commit_offset("group-1", "topic-a", 0, 10, -1, None)
+            .unwrap();
+        om.commit_offset("group-1", "topic-a", 1, 20, -1, None)
+            .unwrap();
+        om.commit_offset("group-1", "topic-b", 0, 30, -1, None)
+            .unwrap();
 
         let offsets = om.fetch_offsets_for_topic("group-1", "topic-a");
         assert_eq!(offsets.len(), 2);
@@ -240,9 +247,12 @@ mod tests {
     fn test_offset_manager_fetch_all_for_group() {
         let om = OffsetManager::new(None);
 
-        om.commit_offset("group-1", "topic-a", 0, 10, -1, None).unwrap();
-        om.commit_offset("group-1", "topic-b", 0, 20, -1, None).unwrap();
-        om.commit_offset("group-2", "topic-a", 0, 30, -1, None).unwrap();
+        om.commit_offset("group-1", "topic-a", 0, 10, -1, None)
+            .unwrap();
+        om.commit_offset("group-1", "topic-b", 0, 20, -1, None)
+            .unwrap();
+        om.commit_offset("group-2", "topic-a", 0, 30, -1, None)
+            .unwrap();
 
         let all = om.fetch_all_offsets_for_group("group-1");
         assert_eq!(all.len(), 2);
@@ -254,9 +264,12 @@ mod tests {
     fn test_offset_manager_delete_group() {
         let om = OffsetManager::new(None);
 
-        om.commit_offset("group-1", "topic-a", 0, 10, -1, None).unwrap();
-        om.commit_offset("group-1", "topic-b", 0, 20, -1, None).unwrap();
-        om.commit_offset("group-2", "topic-a", 0, 30, -1, None).unwrap();
+        om.commit_offset("group-1", "topic-a", 0, 10, -1, None)
+            .unwrap();
+        om.commit_offset("group-1", "topic-b", 0, 20, -1, None)
+            .unwrap();
+        om.commit_offset("group-2", "topic-a", 0, 30, -1, None)
+            .unwrap();
 
         om.delete_group_offsets("group-1");
 
@@ -269,8 +282,10 @@ mod tests {
     fn test_offset_manager_list_groups() {
         let om = OffsetManager::new(None);
 
-        om.commit_offset("group-1", "topic-a", 0, 10, -1, None).unwrap();
-        om.commit_offset("group-2", "topic-a", 0, 20, -1, None).unwrap();
+        om.commit_offset("group-1", "topic-a", 0, 10, -1, None)
+            .unwrap();
+        om.commit_offset("group-2", "topic-a", 0, 20, -1, None)
+            .unwrap();
 
         let groups = om.list_groups();
         assert_eq!(groups.len(), 2);
@@ -283,11 +298,14 @@ mod tests {
         let om = OffsetManager::new(None);
 
         assert_eq!(om.offset_count(), 0);
-        om.commit_offset("group-1", "topic-a", 0, 10, -1, None).unwrap();
+        om.commit_offset("group-1", "topic-a", 0, 10, -1, None)
+            .unwrap();
         assert_eq!(om.offset_count(), 1);
-        om.commit_offset("group-1", "topic-a", 0, 20, -1, None).unwrap();
+        om.commit_offset("group-1", "topic-a", 0, 20, -1, None)
+            .unwrap();
         assert_eq!(om.offset_count(), 1); // overwrite, not new
-        om.commit_offset("group-1", "topic-a", 1, 30, -1, None).unwrap();
+        om.commit_offset("group-1", "topic-a", 1, 30, -1, None)
+            .unwrap();
         assert_eq!(om.offset_count(), 2);
     }
 }

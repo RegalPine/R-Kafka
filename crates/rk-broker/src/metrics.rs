@@ -54,8 +54,12 @@ impl BrokerMetrics {
     pub fn record_request(&self, api_key: i16) {
         self.total_requests.fetch_add(1, Ordering::Relaxed);
         match api_key {
-            0 => { self.produce_requests.fetch_add(1, Ordering::Relaxed); }
-            1 => { self.fetch_requests.fetch_add(1, Ordering::Relaxed); }
+            0 => {
+                self.produce_requests.fetch_add(1, Ordering::Relaxed);
+            }
+            1 => {
+                self.fetch_requests.fetch_add(1, Ordering::Relaxed);
+            }
             _ => {}
         }
     }
@@ -72,13 +76,16 @@ impl BrokerMetrics {
 
     /// 记录 Produce 消息
     pub fn record_produce(&self, message_count: u64, byte_count: u64) {
-        self.total_messages_produced.fetch_add(message_count, Ordering::Relaxed);
-        self.total_bytes_produced.fetch_add(byte_count, Ordering::Relaxed);
+        self.total_messages_produced
+            .fetch_add(message_count, Ordering::Relaxed);
+        self.total_bytes_produced
+            .fetch_add(byte_count, Ordering::Relaxed);
     }
 
     /// 记录 Fetch 字节数
     pub fn record_fetch(&self, byte_count: u64) {
-        self.total_bytes_fetched.fetch_add(byte_count, Ordering::Relaxed);
+        self.total_bytes_fetched
+            .fetch_add(byte_count, Ordering::Relaxed);
     }
 
     /// 记录新连接
@@ -164,57 +171,90 @@ impl MetricsSnapshot {
         // uptime
         out.push_str("# HELP rk_broker_uptime_seconds Broker uptime in seconds\n");
         out.push_str("# TYPE rk_broker_uptime_seconds gauge\n");
-        out.push_str(&format!("rk_broker_uptime_seconds{{{}}} {}\n", labels, self.uptime_secs));
+        out.push_str(&format!(
+            "rk_broker_uptime_seconds{{{}}} {}\n",
+            labels, self.uptime_secs
+        ));
 
         // requests
         out.push_str("# HELP rk_broker_requests_total Total number of requests\n");
         out.push_str("# TYPE rk_broker_requests_total counter\n");
-        out.push_str(&format!("rk_broker_requests_total{{{}}} {}\n", labels, self.total_requests));
+        out.push_str(&format!(
+            "rk_broker_requests_total{{{}}} {}\n",
+            labels, self.total_requests
+        ));
 
         // responses
         out.push_str("# HELP rk_broker_responses_total Total number of responses\n");
         out.push_str("# TYPE rk_broker_responses_total counter\n");
-        out.push_str(&format!("rk_broker_responses_total{{{}}} {}\n", labels, self.total_responses));
+        out.push_str(&format!(
+            "rk_broker_responses_total{{{}}} {}\n",
+            labels, self.total_responses
+        ));
 
         // errors
         out.push_str("# HELP rk_broker_errors_total Total number of errors\n");
         out.push_str("# TYPE rk_broker_errors_total counter\n");
-        out.push_str(&format!("rk_broker_errors_total{{{}}} {}\n", labels, self.total_errors));
+        out.push_str(&format!(
+            "rk_broker_errors_total{{{}}} {}\n",
+            labels, self.total_errors
+        ));
 
         // produce requests
         out.push_str("# HELP rk_broker_produce_requests_total Total Produce requests\n");
         out.push_str("# TYPE rk_broker_produce_requests_total counter\n");
-        out.push_str(&format!("rk_broker_produce_requests_total{{{}}} {}\n", labels, self.produce_requests));
+        out.push_str(&format!(
+            "rk_broker_produce_requests_total{{{}}} {}\n",
+            labels, self.produce_requests
+        ));
 
         // fetch requests
         out.push_str("# HELP rk_broker_fetch_requests_total Total Fetch requests\n");
         out.push_str("# TYPE rk_broker_fetch_requests_total counter\n");
-        out.push_str(&format!("rk_broker_fetch_requests_total{{{}}} {}\n", labels, self.fetch_requests));
+        out.push_str(&format!(
+            "rk_broker_fetch_requests_total{{{}}} {}\n",
+            labels, self.fetch_requests
+        ));
 
         // messages produced
         out.push_str("# HELP rk_broker_messages_produced_total Total messages produced\n");
         out.push_str("# TYPE rk_broker_messages_produced_total counter\n");
-        out.push_str(&format!("rk_broker_messages_produced_total{{{}}} {}\n", labels, self.total_messages_produced));
+        out.push_str(&format!(
+            "rk_broker_messages_produced_total{{{}}} {}\n",
+            labels, self.total_messages_produced
+        ));
 
         // bytes produced
         out.push_str("# HELP rk_broker_bytes_produced_total Total bytes produced\n");
         out.push_str("# TYPE rk_broker_bytes_produced_total counter\n");
-        out.push_str(&format!("rk_broker_bytes_produced_total{{{}}} {}\n", labels, self.total_bytes_produced));
+        out.push_str(&format!(
+            "rk_broker_bytes_produced_total{{{}}} {}\n",
+            labels, self.total_bytes_produced
+        ));
 
         // bytes fetched
         out.push_str("# HELP rk_broker_bytes_fetched_total Total bytes fetched\n");
         out.push_str("# TYPE rk_broker_bytes_fetched_total counter\n");
-        out.push_str(&format!("rk_broker_bytes_fetched_total{{{}}} {}\n", labels, self.total_bytes_fetched));
+        out.push_str(&format!(
+            "rk_broker_bytes_fetched_total{{{}}} {}\n",
+            labels, self.total_bytes_fetched
+        ));
 
         // active connections
         out.push_str("# HELP rk_broker_active_connections Current active connections\n");
         out.push_str("# TYPE rk_broker_active_connections gauge\n");
-        out.push_str(&format!("rk_broker_active_connections{{{}}} {}\n", labels, self.active_connections));
+        out.push_str(&format!(
+            "rk_broker_active_connections{{{}}} {}\n",
+            labels, self.active_connections
+        ));
 
         // total connections
         out.push_str("# HELP rk_broker_total_connections_total Total connections accepted\n");
         out.push_str("# TYPE rk_broker_total_connections_total counter\n");
-        out.push_str(&format!("rk_broker_total_connections_total{{{}}} {}\n", labels, self.total_connections));
+        out.push_str(&format!(
+            "rk_broker_total_connections_total{{{}}} {}\n",
+            labels, self.total_connections
+        ));
 
         out
     }

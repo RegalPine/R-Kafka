@@ -10,11 +10,11 @@
 //! Phase 3: 多 Broker 模式，支持 Follower Replica 管理。
 
 use dashmap::DashMap;
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use rk_core::types::{BrokerId, Offset, PartitionId, TopicName};
 use tracing::info;
 
-use crate::hw_manager::{HighWatermarkManager, HWUpdate, LagStats};
+use crate::hw_manager::{HWUpdate, HighWatermarkManager, LagStats};
 use crate::isr::{ISRConfig, ISREvent, ISRTracker};
 use crate::replica::PartitionReplicaSet;
 
@@ -114,11 +114,7 @@ impl ReplicaManager {
     }
 
     /// 删除 Partition 的副本集合
-    pub fn delete_replica_set(
-        &self,
-        topic: &TopicName,
-        partition: PartitionId,
-    ) -> Result<()> {
+    pub fn delete_replica_set(&self, topic: &TopicName, partition: PartitionId) -> Result<()> {
         let key = ReplicaPartitionKey::new(topic.clone(), partition);
 
         match self.replica_sets.remove(&key) {
@@ -193,15 +189,12 @@ impl ReplicaManager {
         new_leo: Offset,
     ) -> Result<HWUpdate> {
         let key = ReplicaPartitionKey::new(topic.clone(), partition);
-        let mut entry = self
-            .replica_sets
-            .get_mut(&key)
-            .ok_or_else(|| {
-                RkError::Protocol(format!(
-                    "Replica set not found for {}-{}",
-                    topic.0, partition.0
-                ))
-            })?;
+        let mut entry = self.replica_sets.get_mut(&key).ok_or_else(|| {
+            RkError::Protocol(format!(
+                "Replica set not found for {}-{}",
+                topic.0, partition.0
+            ))
+        })?;
 
         let replica_set = entry.value_mut();
         self.hw_manager.update_leader_leo(replica_set, new_leo);
@@ -226,15 +219,12 @@ impl ReplicaManager {
         leader_epoch: i32,
     ) -> Result<(Vec<ISREvent>, HWUpdate)> {
         let key = ReplicaPartitionKey::new(topic.clone(), partition);
-        let mut entry = self
-            .replica_sets
-            .get_mut(&key)
-            .ok_or_else(|| {
-                RkError::Protocol(format!(
-                    "Replica set not found for {}-{}",
-                    topic.0, partition.0
-                ))
-            })?;
+        let mut entry = self.replica_sets.get_mut(&key).ok_or_else(|| {
+            RkError::Protocol(format!(
+                "Replica set not found for {}-{}",
+                topic.0, partition.0
+            ))
+        })?;
 
         let replica_set = entry.value_mut();
 
@@ -249,9 +239,10 @@ impl ReplicaManager {
         // 2. 检查 ISR 扩缩容
         let isr_events = if isr_may_change || true {
             // 总是检查 ISR (因为可能超时)
-            let mut tracker = self.isr_tracker.lock().map_err(|e| {
-                RkError::Internal(format!("ISR tracker lock poisoned: {}", e))
-            })?;
+            let mut tracker = self
+                .isr_tracker
+                .lock()
+                .map_err(|e| RkError::Internal(format!("ISR tracker lock poisoned: {}", e)))?;
             tracker.check_and_update_isr(replica_set)
         } else {
             Vec::new()
@@ -278,11 +269,7 @@ impl ReplicaManager {
     }
 
     /// 获取指定 Partition 的 ISR 集合
-    pub fn get_isr(
-        &self,
-        topic: &TopicName,
-        partition: PartitionId,
-    ) -> Option<Vec<BrokerId>> {
+    pub fn get_isr(&self, topic: &TopicName, partition: PartitionId) -> Option<Vec<BrokerId>> {
         self.get_replica_set(topic, partition)
             .map(|rs| rs.isr.iter().copied().collect())
     }
@@ -307,16 +294,11 @@ impl ReplicaManager {
         follower_id: BrokerId,
     ) -> Option<i64> {
         self.get_replica_set(topic, partition)
-            .map(|rs| self.hw_manager.follower_lag(&rs, follower_id))
-            .flatten()
+            .and_then(|rs| self.hw_manager.follower_lag(&rs, follower_id))
     }
 
     /// 获取指定 Partition 的 lag 统计
-    pub fn get_lag_stats(
-        &self,
-        topic: &TopicName,
-        partition: PartitionId,
-    ) -> Option<LagStats> {
+    pub fn get_lag_stats(&self, topic: &TopicName, partition: PartitionId) -> Option<LagStats> {
         self.get_replica_set(topic, partition)
             .map(|rs| self.hw_manager.lag_stats(&rs))
     }
@@ -328,11 +310,7 @@ impl ReplicaManager {
     }
 
     /// 检查 ISR 是否满足最小大小要求
-    pub fn is_isr_sufficient(
-        &self,
-        topic: &TopicName,
-        partition: PartitionId,
-    ) -> bool {
+    pub fn is_isr_sufficient(&self, topic: &TopicName, partition: PartitionId) -> bool {
         let tracker = self.isr_tracker.lock().unwrap();
         self.get_replica_set(topic, partition)
             .map(|rs| tracker.is_isr_sufficient(&rs))
@@ -429,11 +407,14 @@ mod tests {
             .unwrap();
         assert!(mgr.has_replica_set(&topic("test"), partition(0)));
 
-        mgr.delete_replica_set(&topic("test"), partition(0)).unwrap();
+        mgr.delete_replica_set(&topic("test"), partition(0))
+            .unwrap();
         assert!(!mgr.has_replica_set(&topic("test"), partition(0)));
 
         // 删除不存在的报错
-        assert!(mgr.delete_replica_set(&topic("test"), partition(0)).is_err());
+        assert!(mgr
+            .delete_replica_set(&topic("test"), partition(0))
+            .is_err());
     }
 
     #[test]
@@ -464,24 +445,12 @@ mod tests {
 
         // Follower 2 fetch
         let (_isr_events, _hw_update) = mgr
-            .on_follower_fetch(
-                &topic("test"),
-                partition(0),
-                broker(2),
-                Offset(90),
-                0,
-            )
+            .on_follower_fetch(&topic("test"), partition(0), broker(2), Offset(90), 0)
             .unwrap();
 
         // Follower 3 fetch
         let (_isr_events2, _hw_update2) = mgr
-            .on_follower_fetch(
-                &topic("test"),
-                partition(0),
-                broker(3),
-                Offset(80),
-                0,
-            )
+            .on_follower_fetch(&topic("test"), partition(0), broker(3), Offset(80), 0)
             .unwrap();
 
         // HW 应该更新为 min(100, 90, 80) = 80
@@ -525,14 +494,8 @@ mod tests {
         mgr.on_leader_append(&topic("test"), partition(0), Offset(100))
             .unwrap();
 
-        mgr.on_follower_fetch(
-            &topic("test"),
-            partition(0),
-            broker(2),
-            Offset(80),
-            0,
-        )
-        .unwrap();
+        mgr.on_follower_fetch(&topic("test"), partition(0), broker(2), Offset(80), 0)
+            .unwrap();
 
         assert_eq!(
             mgr.get_follower_lag(&topic("test"), partition(0), broker(2)),
@@ -550,23 +513,11 @@ mod tests {
         mgr.on_leader_append(&topic("test"), partition(0), Offset(100))
             .unwrap();
 
-        mgr.on_follower_fetch(
-            &topic("test"),
-            partition(0),
-            broker(2),
-            Offset(80),
-            0,
-        )
-        .unwrap();
+        mgr.on_follower_fetch(&topic("test"), partition(0), broker(2), Offset(80), 0)
+            .unwrap();
 
-        mgr.on_follower_fetch(
-            &topic("test"),
-            partition(0),
-            broker(3),
-            Offset(60),
-            0,
-        )
-        .unwrap();
+        mgr.on_follower_fetch(&topic("test"), partition(0), broker(3), Offset(60), 0)
+            .unwrap();
 
         let stats = mgr.get_lag_stats(&topic("test"), partition(0)).unwrap();
         assert_eq!(stats.follower_count, 2);
@@ -586,12 +537,8 @@ mod tests {
         )
         .unwrap();
 
-        mgr.create_replica_set(
-            topic("test"),
-            partition(1),
-            vec![broker(1), broker(2)],
-        )
-        .unwrap();
+        mgr.create_replica_set(topic("test"), partition(1), vec![broker(1), broker(2)])
+            .unwrap();
 
         let summary = mgr.summary();
         assert_eq!(summary.partition_count, 2);
@@ -605,19 +552,11 @@ mod tests {
     fn test_topic_names() {
         let mgr = make_manager();
 
-        mgr.create_replica_set(
-            topic("topic-a"),
-            partition(0),
-            vec![broker(1)],
-        )
-        .unwrap();
+        mgr.create_replica_set(topic("topic-a"), partition(0), vec![broker(1)])
+            .unwrap();
 
-        mgr.create_replica_set(
-            topic("topic-b"),
-            partition(0),
-            vec![broker(1)],
-        )
-        .unwrap();
+        mgr.create_replica_set(topic("topic-b"), partition(0), vec![broker(1)])
+            .unwrap();
 
         let names = mgr.topic_names();
         assert_eq!(names.len(), 2);

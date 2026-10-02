@@ -139,10 +139,7 @@ impl ISRTracker {
     ///
     /// 返回 ISR 变更事件列表。
     /// 每次 Leader 收到 Follower Fetch 时调用此方法。
-    pub fn check_and_update_isr(
-        &mut self,
-        replica_set: &mut PartitionReplicaSet,
-    ) -> Vec<ISREvent> {
+    pub fn check_and_update_isr(&mut self, replica_set: &mut PartitionReplicaSet) -> Vec<ISREvent> {
         let mut events = Vec::new();
 
         let leader_leo = replica_set.leader_leo;
@@ -157,7 +154,8 @@ impl ISRTracker {
             }
 
             if let Some(info) = replica_set.replica_info(broker_id) {
-                let should_remove = self.should_shrink_isr(info, leader_leo, lag_time_max, lag_bytes_max);
+                let should_remove =
+                    self.should_shrink_isr(info, leader_leo, lag_time_max, lag_bytes_max);
 
                 if let Some(reason) = should_remove {
                     replica_set.isr.remove(&broker_id);
@@ -388,7 +386,10 @@ mod tests {
     #[test]
     fn test_isr_tracker_default_config() {
         let tracker = ISRTracker::with_defaults();
-        assert_eq!(tracker.config().replica_lag_time_max, Duration::from_secs(30));
+        assert_eq!(
+            tracker.config().replica_lag_time_max,
+            Duration::from_secs(30)
+        );
         assert_eq!(tracker.config().replica_lag_max_bytes, None);
         assert_eq!(tracker.config().min_isr_size, 1);
     }
@@ -452,7 +453,13 @@ mod tests {
 
         assert!(!prs.isr.contains(&broker(2)));
         let has_lag_shrink = events.iter().any(|e| {
-            matches!(e, ISREvent::Shrunk { reason: ShrinkReason::LagTooLarge, .. })
+            matches!(
+                e,
+                ISREvent::Shrunk {
+                    reason: ShrinkReason::LagTooLarge,
+                    ..
+                }
+            )
         });
         assert!(has_lag_shrink);
     }
@@ -480,7 +487,9 @@ mod tests {
         let events = tracker.check_and_update_isr(&mut prs);
 
         assert!(prs.isr.contains(&broker(2)));
-        let has_expand = events.iter().any(|e| matches!(e, ISREvent::Expanded { .. }));
+        let has_expand = events
+            .iter()
+            .any(|e| matches!(e, ISREvent::Expanded { .. }));
         assert!(has_expand);
     }
 

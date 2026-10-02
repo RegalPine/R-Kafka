@@ -2,10 +2,10 @@
 //!
 //! Controller 发送: 更新 Partition 的 Leader 和 ISR 列表。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 #[derive(Debug, Clone)]
 pub struct LeaderAndIsrPartitionState {
@@ -47,13 +47,24 @@ impl KafkaRequestDecoder for LeaderAndIsrRequest {
             let removing_replicas = reader.read_compact_array(|r| r.read_i32())?;
             let _tags = reader.read_tagged_fields()?;
             partition_states.push(LeaderAndIsrPartitionState {
-                topic_name, partition_index, controller_epoch,
-                leader, leader_epoch, isr, partition_epoch,
-                replicas, adding_replicas, removing_replicas,
+                topic_name,
+                partition_index,
+                controller_epoch,
+                leader,
+                leader_epoch,
+                isr,
+                partition_epoch,
+                replicas,
+                adding_replicas,
+                removing_replicas,
             });
         }
         let _tags = reader.read_tagged_fields()?;
-        Ok(Self { controller_id, controller_epoch, partition_states })
+        Ok(Self {
+            controller_id,
+            controller_epoch,
+            partition_states,
+        })
     }
 }
 
@@ -95,20 +106,24 @@ mod tests {
     fn test_leader_and_isr_request_decode() {
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
-        w.write_i32(1);   // controller_id
-        w.write_i32(5);   // controller_epoch
-        w.write_i32(1);   // 1 partition (non-compact count)
-        // partition state
+        w.write_i32(1); // controller_id
+        w.write_i32(5); // controller_epoch
+        w.write_i32(1); // 1 partition (non-compact count)
+                        // partition state
         w.write_compact_string("test-topic");
-        w.write_i32(0);   // partition_index
-        w.write_i32(5);   // controller_epoch
-        w.write_i32(1);   // leader
-        w.write_i32(3);   // leader_epoch
+        w.write_i32(0); // partition_index
+        w.write_i32(5); // controller_epoch
+        w.write_i32(1); // leader
+        w.write_i32(3); // leader_epoch
         w.write_compact_array(&[1i32, 2, 3], |w2, &v| w2.write_i32(v)); // isr
-        w.write_i32(1);   // partition_epoch
+        w.write_i32(1); // partition_epoch
         w.write_compact_array(&[1i32, 2, 3], |w2, &v| w2.write_i32(v)); // replicas
-        w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| w2.write_i32(v)); // adding
-        w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| w2.write_i32(v)); // removing
+        w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| {
+            w2.write_i32(v)
+        }); // adding
+        w.write_compact_array(&[] as &[i32], |w2: &mut KafkaWriter<'_>, &v: &i32| {
+            w2.write_i32(v)
+        }); // removing
         w.write_tagged_fields(&[]);
         w.write_tagged_fields(&[]);
 

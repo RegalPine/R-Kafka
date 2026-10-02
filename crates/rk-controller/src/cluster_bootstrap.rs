@@ -28,7 +28,7 @@ use std::time::{Duration, Instant};
 
 use tracing::{info, warn};
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use rk_core::types::BrokerId;
 
 use crate::broker_reg::{BrokerRegistration, BrokerRegistry};
@@ -264,9 +264,7 @@ impl ClusterBootstrap {
     fn check_activation(&mut self) {
         let alive = self.broker_registry.alive_count();
 
-        let new_state = if alive == 0 {
-            ClusterState::Unavailable
-        } else if alive < self.config.min_broker_count as usize {
+        let new_state = if alive == 0 || alive < self.config.min_broker_count as usize {
             ClusterState::Unavailable
         } else if self.config.expected_broker_count > 0
             && alive < self.config.expected_broker_count as usize
@@ -322,7 +320,11 @@ impl ClusterBootstrap {
 
     /// 获取所有注册的 Broker ID
     pub fn registered_broker_ids(&self) -> Vec<i32> {
-        self.broker_registry.all_brokers().iter().map(|r| r.broker_id).collect()
+        self.broker_registry
+            .all_brokers()
+            .iter()
+            .map(|r| r.broker_id)
+            .collect()
     }
 
     /// 获取 BrokerRegistry 引用
@@ -332,7 +334,8 @@ impl ClusterBootstrap {
 
     /// 获取引导耗时
     pub fn bootstrap_duration(&self) -> Option<Duration> {
-        self.activated_at.map(|t| t.duration_since(self.bootstrap_started_at))
+        self.activated_at
+            .map(|t| t.duration_since(self.bootstrap_started_at))
     }
 
     /// 获取集群摘要
@@ -392,19 +395,18 @@ pub fn initialize_cluster_metadata(
     broker_reg: &BrokerRegistry,
 ) -> Result<()> {
     let alive_brokers = broker_reg.alive_brokers();
-    let mut log_index = sm.last_applied() + 1;
-    
-    for reg in &alive_brokers {
+    let start_index = sm.last_applied() + 1;
+
+    for (i, reg) in alive_brokers.iter().enumerate() {
         let entry = LogEntry::RegisterBroker {
             broker_id: reg.broker_id,
             rack: reg.rack.clone(),
             host: reg.host.clone(),
             port: reg.port,
         };
-        sm.apply(log_index, &entry);
-        log_index += 1;
+        sm.apply(start_index + i as u64, &entry);
     }
-    
+
     info!(
         brokers_registered = alive_brokers.len(),
         "Cluster metadata initialized"

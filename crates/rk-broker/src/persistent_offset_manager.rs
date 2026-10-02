@@ -92,8 +92,9 @@ impl PersistentOffsetManager {
             std::fs::create_dir_all(&self.persist_dir)?;
         }
 
-        let json = serde_json::to_string_pretty(&snapshot)
-            .map_err(|e| rk_core::error::RkError::Storage(format!("JSON serialize error: {}", e)))?;
+        let json = serde_json::to_string_pretty(&snapshot).map_err(|e| {
+            rk_core::error::RkError::Storage(format!("JSON serialize error: {}", e))
+        })?;
 
         let path = self.snapshot_path();
         // 先写临时文件，再 rename (原子性)
@@ -107,12 +108,14 @@ impl PersistentOffsetManager {
 
     /// 构建快照
     fn build_snapshot(&self) -> OffsetSnapshot {
-        let mut groups: HashMap<String, HashMap<String, HashMap<String, CommittedOffsetDto>>> = HashMap::new();
+        let mut groups: HashMap<String, HashMap<String, HashMap<String, CommittedOffsetDto>>> =
+            HashMap::new();
 
         // 从底层 OffsetManager 获取所有 group
         for group_id in self.inner.list_groups() {
             let all_offsets = self.inner.fetch_all_offsets_for_group(&group_id);
-            let mut topic_map: HashMap<String, HashMap<String, CommittedOffsetDto>> = HashMap::new();
+            let mut topic_map: HashMap<String, HashMap<String, CommittedOffsetDto>> =
+                HashMap::new();
 
             for (topic, partition_offsets) in &all_offsets {
                 let mut part_map: HashMap<String, CommittedOffsetDto> = HashMap::new();
@@ -149,7 +152,8 @@ struct OffsetSnapshot {
 
 impl OffsetSnapshot {
     fn total_offsets(&self) -> usize {
-        self.groups.values()
+        self.groups
+            .values()
             .flat_map(|t| t.values())
             .map(|p| p.len())
             .sum()
@@ -177,10 +181,14 @@ mod tests {
         // Phase 1: 写入偏移量并持久化
         {
             let om = Arc::new(OffsetManager::new(None));
-            om.commit_offset("group-1", "topic-a", 0, 42, -1, None).unwrap();
-            om.commit_offset("group-1", "topic-a", 1, 100, -1, Some("meta".to_string())).unwrap();
-            om.commit_offset("group-1", "topic-b", 0, 200, -1, None).unwrap();
-            om.commit_offset("group-2", "topic-a", 0, 300, -1, None).unwrap();
+            om.commit_offset("group-1", "topic-a", 0, 42, -1, None)
+                .unwrap();
+            om.commit_offset("group-1", "topic-a", 1, 100, -1, Some("meta".to_string()))
+                .unwrap();
+            om.commit_offset("group-1", "topic-b", 0, 200, -1, None)
+                .unwrap();
+            om.commit_offset("group-2", "topic-a", 0, 300, -1, None)
+                .unwrap();
 
             let pom = PersistentOffsetManager::new(om.clone(), persist_dir.clone());
             let saved = pom.save_to_disk().unwrap();
@@ -195,14 +203,26 @@ mod tests {
             assert_eq!(loaded, 4);
 
             // 验证数据完整
-            assert_eq!(om2.fetch_offset("group-1", "topic-a", 0).unwrap().offset, 42);
-            assert_eq!(om2.fetch_offset("group-1", "topic-a", 1).unwrap().offset, 100);
+            assert_eq!(
+                om2.fetch_offset("group-1", "topic-a", 0).unwrap().offset,
+                42
+            );
+            assert_eq!(
+                om2.fetch_offset("group-1", "topic-a", 1).unwrap().offset,
+                100
+            );
             assert_eq!(
                 om2.fetch_offset("group-1", "topic-a", 1).unwrap().metadata,
                 Some("meta".to_string())
             );
-            assert_eq!(om2.fetch_offset("group-1", "topic-b", 0).unwrap().offset, 200);
-            assert_eq!(om2.fetch_offset("group-2", "topic-a", 0).unwrap().offset, 300);
+            assert_eq!(
+                om2.fetch_offset("group-1", "topic-b", 0).unwrap().offset,
+                200
+            );
+            assert_eq!(
+                om2.fetch_offset("group-2", "topic-a", 0).unwrap().offset,
+                300
+            );
         }
     }
 
@@ -222,7 +242,11 @@ mod tests {
         let dir = tempdir().unwrap();
         let persist_dir = dir.path().to_path_buf();
         std::fs::create_dir_all(&persist_dir).unwrap();
-        std::fs::write(persist_dir.join("offset_snapshot.json"), "not valid json{{{").unwrap();
+        std::fs::write(
+            persist_dir.join("offset_snapshot.json"),
+            "not valid json{{{",
+        )
+        .unwrap();
 
         let om = Arc::new(OffsetManager::new(None));
         let pom = PersistentOffsetManager::new(om, persist_dir);
@@ -238,7 +262,8 @@ mod tests {
         // 保存快照
         {
             let om = Arc::new(OffsetManager::new(None));
-            om.commit_offset("group-1", "topic-a", 0, 10, -1, None).unwrap();
+            om.commit_offset("group-1", "topic-a", 0, 10, -1, None)
+                .unwrap();
             let pom = PersistentOffsetManager::new(om, persist_dir.clone());
             pom.save_to_disk().unwrap();
         }
@@ -246,13 +271,17 @@ mod tests {
         // 加载到已有数据的 manager
         {
             let om2 = Arc::new(OffsetManager::new(None));
-            om2.commit_offset("group-1", "topic-a", 0, 999, -1, None).unwrap();
+            om2.commit_offset("group-1", "topic-a", 0, 999, -1, None)
+                .unwrap();
 
             let pom2 = PersistentOffsetManager::new(om2.clone(), persist_dir.clone());
             pom2.load_from_disk().unwrap();
 
             // 快照中的值应覆盖内存中的值
-            assert_eq!(om2.fetch_offset("group-1", "topic-a", 0).unwrap().offset, 10);
+            assert_eq!(
+                om2.fetch_offset("group-1", "topic-a", 0).unwrap().offset,
+                10
+            );
         }
     }
 }

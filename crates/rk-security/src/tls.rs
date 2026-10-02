@@ -34,7 +34,7 @@ use rustls::{ClientConfig, RootCertStore, ServerConfig};
 use tokio_rustls::{TlsAcceptor, TlsConnector};
 use tracing::info;
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 
 // ─── TLS 模式 ───────────────────────────────────────────────────────
 
@@ -135,15 +135,10 @@ impl TlsConfig {
         if self.mode == TlsMode::Mutual {
             if let Some(ref ca) = self.ca_path {
                 if !ca.exists() {
-                    return Err(RkError::Config(format!(
-                        "TLS CA cert not found: {:?}",
-                        ca
-                    )));
+                    return Err(RkError::Config(format!("TLS CA cert not found: {:?}", ca)));
                 }
             } else {
-                return Err(RkError::Config(
-                    "mTLS mode requires ca_path".to_string(),
-                ));
+                return Err(RkError::Config("mTLS mode requires ca_path".to_string()));
             }
         }
         Ok(())
@@ -197,9 +192,9 @@ pub fn load_ca_certs(ca_path: &Path) -> Result<RootCertStore> {
     let mut root_store = RootCertStore::empty();
     let mut added = 0;
     for cert in ca_certs {
-        root_store.add(cert).map_err(|e| {
-            RkError::Config(format!("Failed to add CA cert: {}", e))
-        })?;
+        root_store
+            .add(cert)
+            .map_err(|e| RkError::Config(format!("Failed to add CA cert: {}", e)))?;
         added += 1;
     }
     if added == 0 {
@@ -216,16 +211,15 @@ pub fn create_tls_acceptor(config: &TlsConfig) -> Result<TlsAcceptor> {
     let key = load_private_key(&config.key_path)?;
 
     let server_config = match config.mode {
-        TlsMode::OneWay => {
-            ServerConfig::builder()
-                .with_no_client_auth()
-                .with_single_cert(certs, key)
-                .map_err(|e| RkError::Config(format!("TLS server config error: {}", e)))?
-        }
+        TlsMode::OneWay => ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)
+            .map_err(|e| RkError::Config(format!("TLS server config error: {}", e)))?,
         TlsMode::Mutual => {
-            let ca_path = config.ca_path.as_ref().ok_or_else(|| {
-                RkError::Config("mTLS requires CA certificate".to_string())
-            })?;
+            let ca_path = config
+                .ca_path
+                .as_ref()
+                .ok_or_else(|| RkError::Config("mTLS requires CA certificate".to_string()))?;
             let root_store = load_ca_certs(ca_path)?;
             let client_verifier = WebPkiClientVerifier::builder(Arc::new(root_store))
                 .build()
@@ -332,7 +326,10 @@ impl std::fmt::Display for CertificateInfo {
         write!(
             f,
             "Certificate(subject={}, issuer={}, remaining={}d, ca={})",
-            self.subject, self.issuer, self.remaining_days(), self.is_ca
+            self.subject,
+            self.issuer,
+            self.remaining_days(),
+            self.is_ca
         )
     }
 }
@@ -368,7 +365,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 // ─── TLS 连接状态 ───────────────────────────────────────────────────
 
 /// TLS 连接状态
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TlsConnectionState {
     /// 是否已加密
     pub encrypted: bool,
@@ -380,18 +377,6 @@ pub struct TlsConnectionState {
     pub client_authenticated: bool,
     /// 服务端名称 (SNI)
     pub sni: Option<String>,
-}
-
-impl Default for TlsConnectionState {
-    fn default() -> Self {
-        Self {
-            encrypted: false,
-            version: None,
-            cipher_suite: None,
-            client_authenticated: false,
-            sni: None,
-        }
-    }
 }
 
 impl std::fmt::Display for TlsConnectionState {
@@ -418,7 +403,7 @@ pub enum SecureStream {
     /// 明文 TCP
     Plain(tokio::net::TcpStream),
     /// TLS 加密
-    Tls(tokio_rustls::server::TlsStream<tokio::net::TcpStream>),
+    Tls(Box<tokio_rustls::server::TlsStream<tokio::net::TcpStream>>),
 }
 
 impl SecureStream {
@@ -430,9 +415,7 @@ impl SecureStream {
                 let (_, server_conn) = tls.get_ref();
                 TlsConnectionState {
                     encrypted: true,
-                    version: server_conn
-                        .protocol_version()
-                        .map(|v| format!("{:?}", v)),
+                    version: server_conn.protocol_version().map(|v| format!("{:?}", v)),
                     cipher_suite: server_conn
                         .negotiated_cipher_suite()
                         .map(|c| format!("{:?}", c.suite())),
@@ -477,8 +460,7 @@ mod tests {
 
     #[test]
     fn test_tls_config_mutual() {
-        let config = TlsConfig::enabled("/tmp/cert.pem", "/tmp/key.pem")
-            .mutual("/tmp/ca.pem");
+        let config = TlsConfig::enabled("/tmp/cert.pem", "/tmp/key.pem").mutual("/tmp/ca.pem");
         assert_eq!(config.mode, TlsMode::Mutual);
         assert_eq!(config.ca_path, Some(PathBuf::from("/tmp/ca.pem")));
     }

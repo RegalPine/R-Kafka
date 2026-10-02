@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use dashmap::DashMap;
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use rk_core::types::{Offset, PartitionId, TopicName};
 use rk_storage::recovery::recover_partition;
 use rk_storage::CommitLog;
@@ -94,10 +94,13 @@ impl PartitionManager {
         if !data_dir.exists() {
             std::fs::create_dir_all(&data_dir)?;
             info!(data_dir = %data_dir.display(), "Created new data directory");
-            return Ok((pm, PartitionManagerRecoveryResult {
-                topics_recovered: 0,
-                partitions_recovered: 0,
-            }));
+            return Ok((
+                pm,
+                PartitionManagerRecoveryResult {
+                    topics_recovered: 0,
+                    partitions_recovered: 0,
+                },
+            ));
         }
 
         // 扫描 data_dir 下的子目录，解析 {topic}-{partition} 格式
@@ -126,14 +129,18 @@ impl PartitionManager {
 
         if topic_partitions.is_empty() {
             info!("No existing partitions found in {}", data_dir.display());
-            return Ok((pm, PartitionManagerRecoveryResult {
-                topics_recovered: 0,
-                partitions_recovered: 0,
-            }));
+            return Ok((
+                pm,
+                PartitionManagerRecoveryResult {
+                    topics_recovered: 0,
+                    partitions_recovered: 0,
+                },
+            ));
         }
 
         // 按 topic 分组，计算每个 topic 的 partition 数
-        let mut topic_map: std::collections::HashMap<String, Vec<i32>> = std::collections::HashMap::new();
+        let mut topic_map: std::collections::HashMap<String, Vec<i32>> =
+            std::collections::HashMap::new();
         for (topic, pid) in &topic_partitions {
             topic_map.entry(topic.clone()).or_default().push(*pid);
         }
@@ -170,10 +177,8 @@ impl PartitionManager {
                                 "Crash recovery truncated corrupted data"
                             );
                         }
-                        let key = PartitionKey::new(
-                            TopicName(topic_name.clone()),
-                            PartitionId(pid),
-                        );
+                        let key =
+                            PartitionKey::new(TopicName(topic_name.clone()), PartitionId(pid));
                         pm.partitions.insert(key, cl);
                         total_partitions += 1;
                     }
@@ -196,10 +201,13 @@ impl PartitionManager {
             "Partition recovery complete"
         );
 
-        Ok((pm, PartitionManagerRecoveryResult {
-            topics_recovered: topic_map.len(),
-            partitions_recovered: total_partitions,
-        }))
+        Ok((
+            pm,
+            PartitionManagerRecoveryResult {
+                topics_recovered: topic_map.len(),
+                partitions_recovered: total_partitions,
+            },
+        ))
     }
 
     /// 创建或获取 Topic (自动创建 Topic)
@@ -255,16 +263,8 @@ impl PartitionManager {
     /// 追加写入 RecordBatch 到指定 partition
     ///
     /// 返回该 batch 的 base_offset
-    pub fn append_batch(
-        &self,
-        topic: &str,
-        partition: i32,
-        batch_bytes: &[u8],
-    ) -> Result<Offset> {
-        let key = PartitionKey::new(
-            TopicName(topic.to_string()),
-            PartitionId(partition),
-        );
+    pub fn append_batch(&self, topic: &str, partition: i32, batch_bytes: &[u8]) -> Result<Offset> {
+        let key = PartitionKey::new(TopicName(topic.to_string()), PartitionId(partition));
 
         // 确保 partition 存在
         self.ensure_partition(topic, partition)?;
@@ -292,10 +292,7 @@ impl PartitionManager {
         start_offset: Offset,
         max_bytes: usize,
     ) -> Result<Vec<Vec<u8>>> {
-        let key = PartitionKey::new(
-            TopicName(topic.to_string()),
-            PartitionId(partition),
-        );
+        let key = PartitionKey::new(TopicName(topic.to_string()), PartitionId(partition));
 
         let mut entry = self.partitions.get_mut(&key).ok_or_else(|| {
             RkError::Storage(format!("Partition {}-{} not found", topic, partition))
@@ -307,10 +304,7 @@ impl PartitionManager {
 
     /// 获取 partition 的 Log End Offset
     pub fn log_end_offset(&self, topic: &str, partition: i32) -> Result<Offset> {
-        let key = PartitionKey::new(
-            TopicName(topic.to_string()),
-            PartitionId(partition),
-        );
+        let key = PartitionKey::new(TopicName(topic.to_string()), PartitionId(partition));
 
         let entry = self.partitions.get(&key).ok_or_else(|| {
             RkError::Storage(format!("Partition {}-{} not found", topic, partition))
@@ -321,10 +315,7 @@ impl PartitionManager {
 
     /// 获取 partition 的 High Watermark
     pub fn high_watermark(&self, topic: &str, partition: i32) -> Result<Offset> {
-        let key = PartitionKey::new(
-            TopicName(topic.to_string()),
-            PartitionId(partition),
-        );
+        let key = PartitionKey::new(TopicName(topic.to_string()), PartitionId(partition));
 
         let entry = self.partitions.get(&key).ok_or_else(|| {
             RkError::Storage(format!("Partition {}-{} not found", topic, partition))
@@ -340,10 +331,7 @@ impl PartitionManager {
         partition: i32,
         timestamp: i64,
     ) -> Result<Option<Offset>> {
-        let key = PartitionKey::new(
-            TopicName(topic.to_string()),
-            PartitionId(partition),
-        );
+        let key = PartitionKey::new(TopicName(topic.to_string()), PartitionId(partition));
 
         let mut entry = self.partitions.get_mut(&key).ok_or_else(|| {
             RkError::Storage(format!("Partition {}-{} not found", topic, partition))
@@ -352,7 +340,7 @@ impl PartitionManager {
         match entry.read_at_timestamp(timestamp)? {
             Some((batch_bytes, _)) => {
                 // 从 batch header 中提取 base_offset
-                use rk_protocol::record::{HEADER_SIZE, decode_batch_header};
+                use rk_protocol::record::{decode_batch_header, HEADER_SIZE};
                 use rk_protocol::types::KafkaReader;
                 if batch_bytes.len() >= HEADER_SIZE {
                     let mut reader = KafkaReader::new(&batch_bytes);
@@ -499,14 +487,16 @@ impl PartitionManager {
     /// 获取 Topic 配置 (覆盖 + 默认值)
     pub fn get_topic_config(&self, topic_name: &str, key: &str) -> Option<String> {
         let name = TopicName(topic_name.to_string());
-        self.topic_configs.get(&name)
+        self.topic_configs
+            .get(&name)
             .and_then(|configs| configs.get(key).cloned())
     }
 
     /// 获取 Topic 全部配置覆盖
     pub fn get_topic_all_configs(&self, topic_name: &str) -> HashMap<String, String> {
         let name = TopicName(topic_name.to_string());
-        self.topic_configs.get(&name)
+        self.topic_configs
+            .get(&name)
             .map(|c| c.clone())
             .unwrap_or_default()
     }
@@ -514,14 +504,14 @@ impl PartitionManager {
     /// 设置 Topic 配置 (运行时覆盖)
     pub fn set_topic_config(&self, topic_name: &str, key: &str, value: &str) {
         let name = TopicName(topic_name.to_string());
-        let mut entry = self.topic_configs.entry(name).or_insert_with(HashMap::new);
+        let mut entry = self.topic_configs.entry(name).or_default();
         entry.insert(key.to_string(), value.to_string());
     }
 
     /// 批量设置 Topic 配置
     pub fn set_topic_configs(&self, topic_name: &str, configs: HashMap<String, String>) {
         let name = TopicName(topic_name.to_string());
-        let mut entry = self.topic_configs.entry(name).or_insert_with(HashMap::new);
+        let mut entry = self.topic_configs.entry(name).or_default();
         for (k, v) in configs {
             entry.insert(k, v);
         }
@@ -556,7 +546,18 @@ mod tests {
 
     fn make_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10];
-        build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+        build_batch_bytes(
+            base_offset,
+            1,
+            0,
+            1000,
+            2000,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
+        )
     }
 
     #[test]
@@ -672,11 +673,7 @@ mod tests {
         // pm 被 drop
 
         // Phase 2: "重启" — 从磁盘恢复
-        let (pm2, result) = PartitionManager::recover(
-            data_dir.clone(),
-            1_073_741_824,
-            1,
-        ).unwrap();
+        let (pm2, result) = PartitionManager::recover(data_dir.clone(), 1_073_741_824, 1).unwrap();
 
         assert_eq!(result.topics_recovered, 1);
         assert_eq!(result.partitions_recovered, 2);
@@ -693,7 +690,9 @@ mod tests {
         assert_eq!(meta.partition_count, 2);
 
         // 验证数据可读
-        let batches = pm2.read_batches("my-topic", 0, Offset(0), 1_000_000).unwrap();
+        let batches = pm2
+            .read_batches("my-topic", 0, Offset(0), 1_000_000)
+            .unwrap();
         assert!(!batches.is_empty());
     }
 
@@ -702,11 +701,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let data_dir = dir.path().to_path_buf();
 
-        let (pm, result) = PartitionManager::recover(
-            data_dir,
-            1_073_741_824,
-            1,
-        ).unwrap();
+        let (pm, result) = PartitionManager::recover(data_dir, 1_073_741_824, 1).unwrap();
 
         assert_eq!(result.topics_recovered, 0);
         assert_eq!(result.partitions_recovered, 0);
@@ -719,11 +714,7 @@ mod tests {
         // 确保目录不存在
         let _ = std::fs::remove_dir_all(&data_dir);
 
-        let (_pm, result) = PartitionManager::recover(
-            data_dir.clone(),
-            1_073_741_824,
-            1,
-        ).unwrap();
+        let (_pm, result) = PartitionManager::recover(data_dir.clone(), 1_073_741_824, 1).unwrap();
 
         assert_eq!(result.topics_recovered, 0);
         assert_eq!(result.partitions_recovered, 0);

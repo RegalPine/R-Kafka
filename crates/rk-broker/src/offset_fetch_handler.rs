@@ -32,10 +32,7 @@ impl OffsetFetchHandler {
         if let Some(groups) = &request.groups {
             let mut response_groups = Vec::with_capacity(groups.len());
             for group in groups {
-                let topics = self.fetch_group_offsets(
-                    &group.group_id,
-                    group.topics.as_deref(),
-                );
+                let topics = self.fetch_group_offsets(&group.group_id, group.topics.as_deref());
                 response_groups.push(OffsetFetchResponseGroup {
                     group_id: group.group_id.clone(),
                     topics,
@@ -81,7 +78,8 @@ impl OffsetFetchHandler {
                 let mut response_topics = Vec::with_capacity(request_topics.len());
 
                 for req_topic in request_topics {
-                    let mut response_partitions = Vec::with_capacity(req_topic.partition_indexes.len());
+                    let mut response_partitions =
+                        Vec::with_capacity(req_topic.partition_indexes.len());
 
                     for &partition_idx in &req_topic.partition_indexes {
                         let committed = self.offset_manager.fetch_offset(
@@ -159,10 +157,14 @@ mod tests {
 
     fn make_handler_with_data() -> OffsetFetchHandler {
         let om = Arc::new(OffsetManager::new(None));
-        om.commit_offset("group-1", "topic-a", 0, 42, -1, None).unwrap();
-        om.commit_offset("group-1", "topic-a", 1, 100, -1, Some("meta".to_string())).unwrap();
-        om.commit_offset("group-1", "topic-b", 0, 200, -1, None).unwrap();
-        om.commit_offset("group-2", "topic-a", 0, 300, -1, None).unwrap();
+        om.commit_offset("group-1", "topic-a", 0, 42, -1, None)
+            .unwrap();
+        om.commit_offset("group-1", "topic-a", 1, 100, -1, Some("meta".to_string()))
+            .unwrap();
+        om.commit_offset("group-1", "topic-b", 0, 200, -1, None)
+            .unwrap();
+        om.commit_offset("group-2", "topic-a", 0, 300, -1, None)
+            .unwrap();
         OffsetFetchHandler::new(om)
     }
 
@@ -205,7 +207,10 @@ mod tests {
 
         let response = handler.handle(request, 0).unwrap();
         assert_eq!(response.topics[0].partitions[0].committed_offset, -1);
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
     }
 
     #[test]
@@ -220,7 +225,7 @@ mod tests {
 
         let response = handler.handle(request, 0).unwrap();
         assert_eq!(response.topics.len(), 2); // topic-a, topic-b
-        // 按名称排序
+                                              // 按名称排序
         assert_eq!(response.topics[0].name, "topic-a");
         assert_eq!(response.topics[1].name, "topic-b");
     }

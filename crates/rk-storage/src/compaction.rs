@@ -54,7 +54,7 @@ pub enum CleanupPolicy {
 
 impl CleanupPolicy {
     /// 从配置字符串解析
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.trim().to_lowercase().as_str() {
             "compact" => CleanupPolicy::Compact,
             "compact,delete" | "delete,compact" => CleanupPolicy::CompactDelete,
@@ -397,12 +397,8 @@ impl LogCleaner {
 
         let compacted_bytes: u64 = compacted.iter().map(|r| r.raw_bytes.len() as u64).sum();
         let records_removed = records.len() as u64 - compacted.len() as u64;
-        let tombstones_removed = records.iter()
-            .filter(|r| r.is_tombstone())
-            .count() as u64
-            - compacted.iter()
-                .filter(|r| r.is_tombstone())
-                .count() as u64;
+        let tombstones_removed = records.iter().filter(|r| r.is_tombstone()).count() as u64
+            - compacted.iter().filter(|r| r.is_tombstone()).count() as u64;
 
         let end = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -481,17 +477,17 @@ mod tests {
 
     #[test]
     fn test_cleanup_policy_from_str() {
-        assert_eq!(CleanupPolicy::from_str("delete"), CleanupPolicy::Delete);
-        assert_eq!(CleanupPolicy::from_str("compact"), CleanupPolicy::Compact);
+        assert_eq!(CleanupPolicy::parse("delete"), CleanupPolicy::Delete);
+        assert_eq!(CleanupPolicy::parse("compact"), CleanupPolicy::Compact);
         assert_eq!(
-            CleanupPolicy::from_str("compact,delete"),
+            CleanupPolicy::parse("compact,delete"),
             CleanupPolicy::CompactDelete
         );
         assert_eq!(
-            CleanupPolicy::from_str("delete,compact"),
+            CleanupPolicy::parse("delete,compact"),
             CleanupPolicy::CompactDelete
         );
-        assert_eq!(CleanupPolicy::from_str("unknown"), CleanupPolicy::Delete);
+        assert_eq!(CleanupPolicy::parse("unknown"), CleanupPolicy::Delete);
     }
 
     #[test]
@@ -564,11 +560,23 @@ mod tests {
         let mut index = KeyIndex::new();
         index.upsert(
             b"b".to_vec(),
-            KeyPosition { offset: Offset(10), timestamp: 0, segment_idx: 0, byte_offset: 0, batch_size: 0 },
+            KeyPosition {
+                offset: Offset(10),
+                timestamp: 0,
+                segment_idx: 0,
+                byte_offset: 0,
+                batch_size: 0,
+            },
         );
         index.upsert(
             b"a".to_vec(),
-            KeyPosition { offset: Offset(5), timestamp: 0, segment_idx: 0, byte_offset: 0, batch_size: 0 },
+            KeyPosition {
+                offset: Offset(5),
+                timestamp: 0,
+                segment_idx: 0,
+                byte_offset: 0,
+                batch_size: 0,
+            },
         );
 
         let positions = index.retained_positions();

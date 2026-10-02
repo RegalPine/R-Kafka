@@ -28,8 +28,8 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use rk_broker::{PartitionManager, BrokerRouter, OffsetManager};
-use rk_protocol::types::{KafkaWriter, KafkaReader};
+use rk_broker::{BrokerRouter, OffsetManager, PartitionManager};
+use rk_protocol::types::{KafkaReader, KafkaWriter};
 use rk_storage::log_io::build_batch_bytes;
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────
@@ -53,7 +53,12 @@ fn build_flexible_frame(body_builder: impl FnOnce(&mut KafkaWriter<'_>)) -> Vec<
 }
 
 /// 写入 Legacy RequestHeader v0/v1
-fn write_legacy_header(w: &mut KafkaWriter<'_>, api_key: i16, api_version: i16, correlation_id: i32) {
+fn write_legacy_header(
+    w: &mut KafkaWriter<'_>,
+    api_key: i16,
+    api_version: i16,
+    correlation_id: i32,
+) {
     w.write_i16(api_key);
     w.write_i16(api_version);
     w.write_i32(correlation_id);
@@ -61,7 +66,12 @@ fn write_legacy_header(w: &mut KafkaWriter<'_>, api_key: i16, api_version: i16, 
 }
 
 /// 写入 Flexible RequestHeader v2
-fn write_flexible_header(w: &mut KafkaWriter<'_>, api_key: i16, api_version: i16, correlation_id: i32) {
+fn write_flexible_header(
+    w: &mut KafkaWriter<'_>,
+    api_key: i16,
+    api_version: i16,
+    correlation_id: i32,
+) {
     w.write_i16(api_key);
     w.write_i16(api_version);
     w.write_i32(correlation_id);
@@ -82,13 +92,28 @@ async fn read_response_frame(stream: &mut TcpStream) -> Vec<u8> {
 /// 构建测试 RecordBatch
 fn make_test_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
     let records = vec![0u8; record_count as usize * 10];
-    build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+    build_batch_bytes(
+        base_offset,
+        1,
+        0,
+        1000,
+        2000,
+        -1,
+        -1,
+        -1,
+        &records,
+        record_count,
+    )
 }
 
 /// 启动测试服务器
 async fn setup_server() -> u16 {
     let dir = tempfile::tempdir().unwrap();
-    let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+    let pm = Arc::new(PartitionManager::new(
+        dir.path().to_path_buf(),
+        1_073_741_824,
+        1,
+    ));
     let offset_manager = Arc::new(OffsetManager::new(None));
 
     let router = Arc::new(BrokerRouter::with_offset_manager(
@@ -130,7 +155,9 @@ async fn setup_server() -> u16 {
 #[tokio::test]
 async fn test_java_client_produce_consume_flow() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // ═══ Step 1: ApiVersions v3 (Flexible) ═══
     let frame = build_flexible_frame(|w| {
@@ -150,7 +177,7 @@ async fn test_java_client_produce_consume_flow() {
     let error_code = reader.read_i16().unwrap();
     assert_eq!(error_code, 0, "ApiVersions should succeed");
     let _throttle = reader.read_i32().unwrap(); // v1+
-    // v3 flexible: compact_array (unsigned varint len+1)
+                                                // v3 flexible: compact_array (unsigned varint len+1)
     let api_count_varint = reader.read_unsigned_varint().unwrap() as usize;
     let api_count = api_count_varint - 1; // compact array: N+1 = count
     assert!(api_count >= 30, "Should report 30+ APIs, got {}", api_count);
@@ -191,11 +218,11 @@ async fn test_java_client_produce_consume_flow() {
         w.write_string("interop-test");
         w.write_i32(2); // 2 partitions
         w.write_i16(1); // replication_factor = 1
-        // assignments: array of (partition, replicas)
+                        // assignments: array of (partition, replicas)
         w.write_i32(0); // empty assignments
-        // configs: array of (key, value)
+                        // configs: array of (key, value)
         w.write_i32(0); // empty configs
-        // timeout_ms
+                        // timeout_ms
         w.write_i32(30_000);
     });
     stream.write_all(&frame).await.unwrap();
@@ -310,7 +337,9 @@ async fn test_java_client_produce_consume_flow() {
 #[tokio::test]
 async fn test_java_client_consumer_group_flow() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // 先创建 topic
     let frame = build_legacy_frame(|w| {
@@ -350,7 +379,7 @@ async fn test_java_client_consumer_group_flow() {
         w.write_string("test-group"); // group_id
         w.write_string("consumer-1"); // member_id
         w.write_string("consumer"); // protocol_type
-        // protocols: array of (name, metadata)
+                                    // protocols: array of (name, metadata)
         w.write_i32(1);
         w.write_string("range");
         w.write_bytes(&[0u8; 0]); // empty metadata
@@ -383,7 +412,11 @@ async fn test_java_client_consumer_group_flow() {
     assert_eq!(corr_id, 12, "Heartbeat correlation_id");
     let error_code = reader.read_i16().unwrap();
     // 可能返回 0 或 UNKNOWN_MEMBER_ID (25)
-    assert!(error_code == 0 || error_code == 25, "Heartbeat error: {}", error_code);
+    assert!(
+        error_code == 0 || error_code == 25,
+        "Heartbeat error: {}",
+        error_code
+    );
 
     // ═══ OffsetCommit v0 (Legacy) ═══
     let frame = build_legacy_frame(|w| {
@@ -437,7 +470,9 @@ async fn test_java_client_consumer_group_flow() {
 #[tokio::test]
 async fn test_java_client_flexible_pipelining() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // Java client 在同一连接上发送多个 flexible 请求
     for i in 0..10 {
@@ -463,7 +498,9 @@ async fn test_java_client_flexible_pipelining() {
 #[tokio::test]
 async fn test_java_client_mixed_legacy_flexible() {
     let port = setup_server().await;
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // 1. Legacy ApiVersions v0
     let frame = build_legacy_frame(|w| {

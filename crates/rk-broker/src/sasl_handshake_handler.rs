@@ -34,7 +34,10 @@ impl SaslHandshakeHandler {
 
         let supported = self.authenticator.supported_mechanism_names();
 
-        if self.authenticator.is_mechanism_supported(&request.mechanism) {
+        if self
+            .authenticator
+            .is_mechanism_supported(&request.mechanism)
+        {
             Ok(SaslHandshakeResponse::supported(supported))
         } else {
             Ok(SaslHandshakeResponse::unsupported_mechanism(supported))

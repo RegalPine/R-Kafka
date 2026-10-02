@@ -35,10 +35,7 @@ impl CreateTopicsHandler {
             response_topics.push(result);
         }
 
-        debug!(
-            topic_count = request.topics.len(),
-            "CreateTopics handled"
-        );
+        debug!(topic_count = request.topics.len(), "CreateTopics handled");
 
         Ok(CreateTopicsResponse::success(response_topics))
     }
@@ -49,7 +46,11 @@ impl CreateTopicsHandler {
         validate_only: bool,
     ) -> CreateTopicsResponseTopic {
         // 检查 topic 是否已存在
-        if self.partition_manager.get_topic_metadata(&topic.name).is_some() {
+        if self
+            .partition_manager
+            .get_topic_metadata(&topic.name)
+            .is_some()
+        {
             return CreateTopicsResponseTopic {
                 name: topic.name.clone(),
                 error_code: KafkaErrorCode::TopicAlreadyExists,
@@ -64,9 +65,7 @@ impl CreateTopicsHandler {
             return CreateTopicsResponseTopic {
                 name: topic.name.clone(),
                 error_code: KafkaErrorCode::InvalidPartitions,
-                error_message: Some(format!(
-                    "Invalid partition count: {}", topic.num_partitions
-                )),
+                error_message: Some(format!("Invalid partition count: {}", topic.num_partitions)),
             };
         } else {
             topic.num_partitions as u32
@@ -94,7 +93,8 @@ impl CreateTopicsHandler {
         }
 
         // 创建 topic
-        self.partition_manager.get_or_create_topic(&topic.name, num_partitions);
+        self.partition_manager
+            .get_or_create_topic(&topic.name, num_partitions);
 
         debug!(
             topic = %topic.name,
@@ -122,7 +122,11 @@ mod tests {
 
     fn make_handler() -> CreateTopicsHandler {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         CreateTopicsHandler::new(pm)
     }
 
@@ -169,7 +173,10 @@ mod tests {
         };
 
         let response = handler.handle(request, 0).unwrap();
-        assert_eq!(response.topics[0].error_code, KafkaErrorCode::TopicAlreadyExists);
+        assert_eq!(
+            response.topics[0].error_code,
+            KafkaErrorCode::TopicAlreadyExists
+        );
     }
 
     #[test]
@@ -178,7 +185,7 @@ mod tests {
         let request = CreateTopicsRequest {
             topics: vec![CreateTopicsRequestTopic {
                 name: "auto-topic".to_string(),
-                num_partitions: -1, // auto
+                num_partitions: -1,     // auto
                 replication_factor: -1, // auto
                 assignments: vec![],
                 configs: vec![],
@@ -213,7 +220,9 @@ mod tests {
         assert_eq!(response.topics[0].error_code, KafkaErrorCode::None);
 
         // validate_only: topic 不应被创建
-        let meta = handler.partition_manager.get_topic_metadata("validate-topic");
+        let meta = handler
+            .partition_manager
+            .get_topic_metadata("validate-topic");
         assert!(meta.is_none());
     }
 
@@ -233,7 +242,10 @@ mod tests {
         };
 
         let response = handler.handle(request, 0).unwrap();
-        assert_eq!(response.topics[0].error_code, KafkaErrorCode::InvalidReplicationFactor);
+        assert_eq!(
+            response.topics[0].error_code,
+            KafkaErrorCode::InvalidReplicationFactor
+        );
     }
 
     #[test]

@@ -5,12 +5,22 @@ use rk_protocol::apis::broker_heartbeat::*;
 use rk_protocol::error_codes::KafkaErrorCode;
 use tracing::debug;
 
-pub struct BrokerHeartbeatHandler { _broker_id: i32 }
+pub struct BrokerHeartbeatHandler {
+    _broker_id: i32,
+}
 
 impl BrokerHeartbeatHandler {
-    pub fn new(broker_id: i32) -> Self { Self { _broker_id: broker_id } }
+    pub fn new(broker_id: i32) -> Self {
+        Self {
+            _broker_id: broker_id,
+        }
+    }
 
-    pub fn handle(&self, request: BrokerHeartbeatRequest, _version: i16) -> Result<BrokerHeartbeatResponse> {
+    pub fn handle(
+        &self,
+        request: BrokerHeartbeatRequest,
+        _version: i16,
+    ) -> Result<BrokerHeartbeatResponse> {
         debug!(
             broker_id = request.broker_id,
             broker_epoch = request.broker_epoch,

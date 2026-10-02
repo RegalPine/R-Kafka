@@ -22,36 +22,24 @@
 //!     └── ISRTracker (ISR 扩缩容)
 //! ```
 
-pub mod replica;
-pub mod isr;
-pub mod hw_manager;
-pub mod replica_manager;
-pub mod replica_fetcher;
 pub mod election;
+pub mod hw_manager;
+pub mod isr;
 pub mod leader;
+pub mod replica;
+pub mod replica_fetcher;
+pub mod replica_manager;
 
 // Re-exports
-pub use replica::{
-    ReplicaRole, ReplicaState, ReplicaInfo, PartitionReplicaSet,
-};
-pub use isr::{
-    ISRConfig, ISREvent, ShrinkReason, ISRTracker,
-};
-pub use hw_manager::{
-    HighWatermarkManager, HWUpdate, LagStats,
-};
-pub use replica_manager::{
-    ReplicaManager, ReplicaPartitionKey, ReplicaManagerSummary,
-};
-pub use replica_fetcher::{
-    ReplicaFetcherConfig, ReplicaFetcher, ReplicationFetchRequest,
-    ReplicationFetchResponse, ReplicatedBatch, PartitionFetcherState,
-    FetchCycleResult, ReplicaFetcherSummary,
-};
 pub use election::{
-    ElectionConfig, ElectionStrategy, ElectionResult, ElectionFailure,
-    LeaderElector,
+    ElectionConfig, ElectionFailure, ElectionResult, ElectionStrategy, LeaderElector,
 };
-pub use leader::{
-    FollowerProgress, LeaderReplica, LeaderReplicaSummary,
+pub use hw_manager::{HWUpdate, HighWatermarkManager, LagStats};
+pub use isr::{ISRConfig, ISREvent, ISRTracker, ShrinkReason};
+pub use leader::{FollowerProgress, LeaderReplica, LeaderReplicaSummary};
+pub use replica::{PartitionReplicaSet, ReplicaInfo, ReplicaRole, ReplicaState};
+pub use replica_fetcher::{
+    FetchCycleResult, PartitionFetcherState, ReplicaFetcher, ReplicaFetcherConfig,
+    ReplicaFetcherSummary, ReplicatedBatch, ReplicationFetchRequest, ReplicationFetchResponse,
 };
+pub use replica_manager::{ReplicaManager, ReplicaManagerSummary, ReplicaPartitionKey};

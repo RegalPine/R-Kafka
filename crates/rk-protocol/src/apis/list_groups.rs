@@ -2,10 +2,10 @@
 //!
 //! 列出所有消费者组。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -22,7 +22,11 @@ impl KafkaRequestDecoder for ListGroupsRequest {
             let states_filter = reader.read_compact_array(|r| r.read_compact_string())?;
             let _tags = reader.read_tagged_fields()?;
             Ok(Self {
-                states_filter: if states_filter.is_empty() { None } else { Some(states_filter) },
+                states_filter: if states_filter.is_empty() {
+                    None
+                } else {
+                    Some(states_filter)
+                },
             })
         } else {
             Ok(Self {

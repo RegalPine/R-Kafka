@@ -8,13 +8,12 @@
 //! - rk-storage/log_io.rs: 磁盘文件级 I/O (追加写、随机读)
 
 use std::fs::File;
-use std::io::{Read, Write, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Write};
 
-use bytes::{BytesMut, BufMut};
+use bytes::{BufMut, BytesMut};
 use rk_core::error::Result;
 use rk_protocol::record::{
-    RecordBatchHeader, HEADER_SIZE, RECORDBATCH_MAGIC, CRC_OFFSET,
-    decode_batch_header,
+    decode_batch_header, RecordBatchHeader, CRC_OFFSET, HEADER_SIZE, RECORDBATCH_MAGIC,
 };
 use rk_protocol::types::KafkaReader;
 
@@ -42,9 +41,8 @@ pub fn read_batch_from_file(file: &mut File, offset: u64) -> Result<(Vec<u8>, u6
     file.read_exact(&mut header_buf)?;
 
     // 解析 batch_length (offset 8..12) 来确定整个 batch 的大小
-    let batch_length = i32::from_be_bytes([
-        header_buf[8], header_buf[9], header_buf[10], header_buf[11],
-    ]);
+    let batch_length =
+        i32::from_be_bytes([header_buf[8], header_buf[9], header_buf[10], header_buf[11]]);
 
     // 整个 batch 在磁盘上的总大小 = base_offset(8) + batch_length(4) + batch_length
     // batch_length 字段本身不包含 base_offset(8) 和 batch_length(4) 自身的长度
@@ -87,6 +85,7 @@ pub fn read_batch_header_from_file(file: &mut File, offset: u64) -> Result<Recor
 /// - `record_count`: record 数量
 ///
 /// 返回完整的 batch 字节 (含 CRC32C 自动计算)
+#[allow(clippy::too_many_arguments)]
 pub fn build_batch_bytes(
     base_offset: i64,
     partition_leader_epoch: i32,
@@ -99,7 +98,11 @@ pub fn build_batch_bytes(
     records_bytes: &[u8],
     record_count: i32,
 ) -> Vec<u8> {
-    let last_offset_delta = if record_count > 0 { record_count - 1 } else { 0 };
+    let last_offset_delta = if record_count > 0 {
+        record_count - 1
+    } else {
+        0
+    };
 
     // batch_length = partition_leader_epoch(4) + magic(1) + crc(4)
     //   + attributes(2) + last_offset_delta(4) + base_timestamp(8) + max_timestamp(8)
@@ -158,7 +161,10 @@ pub fn verify_batch_crc(batch_bytes: &[u8]) -> bool {
 
     // 读取存储的 CRC (offset 17..21, 即 magic(1) 之后的 4 字节)
     let stored_crc = i32::from_be_bytes([
-        batch_bytes[17], batch_bytes[18], batch_bytes[19], batch_bytes[20],
+        batch_bytes[17],
+        batch_bytes[18],
+        batch_bytes[19],
+        batch_bytes[20],
     ]);
 
     // 计算 CRC (从 magic 开始 = offset 16)，但 CRC 字段本身置零
@@ -197,9 +203,8 @@ pub fn scan_batches_from_file(
         }
 
         // 读取 batch_length
-        let batch_length = i32::from_be_bytes([
-            header_buf[8], header_buf[9], header_buf[10], header_buf[11],
-        ]);
+        let batch_length =
+            i32::from_be_bytes([header_buf[8], header_buf[9], header_buf[10], header_buf[11]]);
 
         if batch_length < 49 {
             // batch_length = partition_leader_epoch(4) + magic(1) + crc(4) + attributes(2)
@@ -286,9 +291,7 @@ mod tests {
     fn test_build_batch_with_records() {
         // 模拟一些 record 字节
         let records = vec![0u8; 100]; // 100 bytes of fake records
-        let batch = build_batch_bytes(
-            0, 1, 0, 1000, 2000, -1, -1, -1, &records, 5,
-        );
+        let batch = build_batch_bytes(0, 1, 0, 1000, 2000, -1, -1, -1, &records, 5);
 
         // 大小 = 61 + 100 = 161
         assert_eq!(batch.len(), HEADER_SIZE + 100);

@@ -2,10 +2,10 @@
 //!
 //! 实现 ProduceRequest / ProduceResponse，支持 v0-v10。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ─────────────────────────────────────────────────────────
 
@@ -74,7 +74,12 @@ impl KafkaRequestDecoder for ProduceRequest {
             })?
         };
 
-        Ok(Self { transactional_id, acks, timeout_ms, topics })
+        Ok(Self {
+            transactional_id,
+            acks,
+            timeout_ms,
+            topics,
+        })
     }
 }
 

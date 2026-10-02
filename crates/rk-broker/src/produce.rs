@@ -6,10 +6,10 @@
 //! 3. 写入 PartitionManager
 //! 4. 构建 ProduceResponse
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use rk_protocol::apis::produce::*;
 use rk_protocol::error_codes::KafkaErrorCode;
-use rk_protocol::record::{HEADER_SIZE, decode_batch_header};
+use rk_protocol::record::{decode_batch_header, HEADER_SIZE};
 use rk_protocol::types::KafkaReader;
 use tracing::{debug, warn};
 
@@ -114,7 +114,9 @@ impl ProduceHandler {
         };
 
         // 写入 CommitLog
-        let base_offset = self.partition_manager.append_batch(topic, partition, record_set)?;
+        let base_offset = self
+            .partition_manager
+            .append_batch(topic, partition, record_set)?;
 
         // 获取当前时间作为 log_append_time (Phase 1: 使用系统时间)
         let log_append_time = std::time::SystemTime::now()
@@ -147,14 +149,27 @@ mod tests {
 
     fn make_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10];
-        build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+        build_batch_bytes(
+            base_offset,
+            1,
+            0,
+            1000,
+            2000,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
+        )
     }
 
     fn make_handler() -> ProduceHandler {
         let dir = tempdir().unwrap();
-        let pm = std::sync::Arc::new(
-            PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1)
-        );
+        let pm = std::sync::Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         ProduceHandler::new(pm)
     }
 
@@ -179,7 +194,10 @@ mod tests {
         let response = handler.handle(request, 0).unwrap();
         assert_eq!(response.topics.len(), 1);
         assert_eq!(response.topics[0].partitions.len(), 1);
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         assert_eq!(response.topics[0].partitions[0].base_offset, 0);
     }
 
@@ -230,7 +248,10 @@ mod tests {
         };
 
         let response = handler.handle(request, 0).unwrap();
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         assert_eq!(response.topics[0].partitions[0].base_offset, -1);
     }
 

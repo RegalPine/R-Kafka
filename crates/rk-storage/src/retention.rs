@@ -117,17 +117,39 @@ pub fn apply_retention(
 mod tests {
     use super::*;
     use crate::log_io::build_batch_bytes;
-    use tempfile::tempdir;
     use rk_core::types::{PartitionId, TopicName};
+    use tempfile::tempdir;
 
     fn make_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10];
-        build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+        build_batch_bytes(
+            base_offset,
+            1,
+            0,
+            1000,
+            2000,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
+        )
     }
 
     fn make_batch_with_ts(base_offset: i64, record_count: i32, timestamp: i64) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10];
-        build_batch_bytes(base_offset, 1, 0, timestamp, timestamp + 100, -1, -1, -1, &records, record_count)
+        build_batch_bytes(
+            base_offset,
+            1,
+            0,
+            timestamp,
+            timestamp + 100,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
+        )
     }
 
     #[test]
@@ -138,9 +160,13 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             1_073_741_824,
-        ).unwrap();
+        )
+        .unwrap();
 
-        let config = RetentionConfig { max_bytes: 100, max_ms: 0 };
+        let config = RetentionConfig {
+            max_bytes: 100,
+            max_ms: 0,
+        };
         let result = apply_retention(&mut cl, &config, 5000).unwrap();
         assert_eq!(result.segments_deleted, 0);
     }
@@ -154,7 +180,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             200, // 200 bytes per segment
-        ).unwrap();
+        )
+        .unwrap();
 
         // 写入多个 batch 产生多个 segment
         for i in 0..6 {
@@ -165,7 +192,10 @@ mod tests {
         assert!(segment_count_before > 1, "Should have multiple segments");
 
         // 设置很小的 max_bytes，触发删除
-        let config = RetentionConfig { max_bytes: 300, max_ms: 0 };
+        let config = RetentionConfig {
+            max_bytes: 300,
+            max_ms: 0,
+        };
         let result = apply_retention(&mut cl, &config, 5000).unwrap();
 
         assert!(result.segments_deleted > 0, "Should have deleted segments");
@@ -181,7 +211,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             200, // 小 segment 强制多个
-        ).unwrap();
+        )
+        .unwrap();
 
         // 写入带时间戳的 batch
         // timestamp=1000
@@ -199,7 +230,10 @@ mod tests {
 
         // now=5000, max_ms=2000 → cutoff=3000
         // timestamp < 3000 的 segment 应被删除
-        let config = RetentionConfig { max_bytes: 0, max_ms: 2000 };
+        let config = RetentionConfig {
+            max_bytes: 0,
+            max_ms: 2000,
+        };
         let result = apply_retention(&mut cl, &config, 5000).unwrap();
 
         // 至少应删除一些 segment (max_timestamp < 3000)
@@ -216,13 +250,17 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             1_073_741_824,
-        ).unwrap();
+        )
+        .unwrap();
 
         cl.append_batch(&make_batch(0, 5)).unwrap();
 
         // max_bytes=0 意味着无限, max_ms=0 意味着无限
         // 但即使设为很小，也应保留至少一个 segment
-        let config = RetentionConfig { max_bytes: 1, max_ms: 1 };
+        let config = RetentionConfig {
+            max_bytes: 1,
+            max_ms: 1,
+        };
         let _result = apply_retention(&mut cl, &config, 999_999).unwrap();
 
         assert_eq!(cl.segment_count(), 1, "Must keep at least 1 segment");
@@ -236,7 +274,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             200, // 小 segment
-        ).unwrap();
+        )
+        .unwrap();
 
         for i in 0..6 {
             cl.append_batch(&make_batch(i * 3, 3)).unwrap();
@@ -244,7 +283,10 @@ mod tests {
 
         assert_eq!(cl.log_start_offset(), Offset(0));
 
-        let config = RetentionConfig { max_bytes: 200, max_ms: 0 };
+        let config = RetentionConfig {
+            max_bytes: 200,
+            max_ms: 0,
+        };
         let result = apply_retention(&mut cl, &config, 5000).unwrap();
 
         if result.segments_deleted > 0 {
@@ -257,6 +299,6 @@ mod tests {
     fn test_retention_config_default() {
         let config = RetentionConfig::default();
         assert_eq!(config.max_bytes, 1_099_511_627_776); // 1TB
-        assert_eq!(config.max_ms, 604_800_000);          // 7 days
+        assert_eq!(config.max_ms, 604_800_000); // 7 days
     }
 }

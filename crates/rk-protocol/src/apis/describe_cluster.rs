@@ -3,10 +3,10 @@
 //! 查询集群元数据信息。
 //! KIP-700, v0+ 全部为 Flexible 格式。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -21,7 +21,9 @@ impl KafkaRequestDecoder for DescribeClusterRequest {
         // v0+ is always flexible
         let include_authorized_operations = reader.read_bool()?;
         let _tags = reader.read_tagged_fields();
-        Ok(Self { include_authorized_operations })
+        Ok(Self {
+            include_authorized_operations,
+        })
     }
 }
 

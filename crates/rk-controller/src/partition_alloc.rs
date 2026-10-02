@@ -114,7 +114,7 @@ impl PartitionAllocator {
 
         // 按 partition_count 排序，优先分配给负载低的 Broker
         let mut sorted_brokers: Vec<&BrokerInfo> = brokers.iter().collect();
-        sorted_brokers.sort_by(|a, b| a.partition_count.cmp(&b.partition_count));
+        sorted_brokers.sort_by_key(|a| a.partition_count);
 
         let broker_ids: Vec<i32> = sorted_brokers.iter().map(|b| b.broker_id).collect();
 
@@ -249,10 +249,7 @@ pub enum AllocationError {
     /// 没有可用 Broker
     NoBrokersAvailable,
     /// Broker 数量不足
-    InsufficientBrokers {
-        required: usize,
-        available: usize,
-    },
+    InsufficientBrokers { required: usize, available: usize },
     /// 无效的 Partition 数量
     InvalidPartitions(u32),
 }
@@ -263,7 +260,10 @@ impl std::fmt::Display for AllocationError {
             AllocationError::NoBrokersAvailable => {
                 write!(f, "No brokers available for partition assignment")
             }
-            AllocationError::InsufficientBrokers { required, available } => {
+            AllocationError::InsufficientBrokers {
+                required,
+                available,
+            } => {
                 write!(
                     f,
                     "Insufficient brokers: need {} but only {} available",
@@ -311,9 +311,9 @@ mod tests {
     #[test]
     fn test_round_robin_basic() {
         let brokers = make_brokers(&[1, 2, 3]);
-        let result = PartitionAllocator::allocate(
-            "test", 3, 2, &brokers, AllocationStrategy::RoundRobin,
-        ).unwrap();
+        let result =
+            PartitionAllocator::allocate("test", 3, 2, &brokers, AllocationStrategy::RoundRobin)
+                .unwrap();
 
         assert_eq!(result.assignments.len(), 3);
 
@@ -327,16 +327,20 @@ mod tests {
             let mut unique = replicas.clone();
             unique.sort();
             unique.dedup();
-            assert_eq!(unique.len(), replicas.len(), "Duplicate brokers in replicas");
+            assert_eq!(
+                unique.len(),
+                replicas.len(),
+                "Duplicate brokers in replicas"
+            );
         }
     }
 
     #[test]
     fn test_round_robin_single_broker() {
         let brokers = make_brokers(&[1]);
-        let result = PartitionAllocator::allocate(
-            "test", 3, 1, &brokers, AllocationStrategy::RoundRobin,
-        ).unwrap();
+        let result =
+            PartitionAllocator::allocate("test", 3, 1, &brokers, AllocationStrategy::RoundRobin)
+                .unwrap();
 
         assert_eq!(result.assignments.len(), 3);
         for (_, replicas) in &result.assignments {
@@ -347,9 +351,9 @@ mod tests {
     #[test]
     fn test_round_robin_distribution() {
         let brokers = make_brokers(&[1, 2, 3]);
-        let result = PartitionAllocator::allocate(
-            "test", 6, 1, &brokers, AllocationStrategy::RoundRobin,
-        ).unwrap();
+        let result =
+            PartitionAllocator::allocate("test", 6, 1, &brokers, AllocationStrategy::RoundRobin)
+                .unwrap();
 
         // 每个 broker 应该分配 2 个 partition
         let mut counts: HashMap<i32, u32> = HashMap::new();
@@ -367,9 +371,9 @@ mod tests {
     #[test]
     fn test_round_robin_rf_equals_brokers() {
         let brokers = make_brokers(&[1, 2, 3]);
-        let result = PartitionAllocator::allocate(
-            "test", 3, 3, &brokers, AllocationStrategy::RoundRobin,
-        ).unwrap();
+        let result =
+            PartitionAllocator::allocate("test", 3, 3, &brokers, AllocationStrategy::RoundRobin)
+                .unwrap();
 
         // 每个 partition 的副本应该包含所有 broker
         for (_, replicas) in &result.assignments {
@@ -381,13 +385,11 @@ mod tests {
 
     #[test]
     fn test_rack_aware_basic() {
-        let brokers = make_brokers_with_racks(&[
-            (1, "rack-a"), (2, "rack-b"), (3, "rack-c"),
-        ]);
+        let brokers = make_brokers_with_racks(&[(1, "rack-a"), (2, "rack-b"), (3, "rack-c")]);
 
-        let result = PartitionAllocator::allocate(
-            "test", 3, 3, &brokers, AllocationStrategy::RackAware,
-        ).unwrap();
+        let result =
+            PartitionAllocator::allocate("test", 3, 3, &brokers, AllocationStrategy::RackAware)
+                .unwrap();
 
         assert_eq!(result.assignments.len(), 3);
 
@@ -405,13 +407,11 @@ mod tests {
     #[test]
     fn test_rack_aware_fallback_to_round_robin() {
         // 只有 2 个机架，但需要 3 个副本
-        let brokers = make_brokers_with_racks(&[
-            (1, "rack-a"), (2, "rack-a"), (3, "rack-b"),
-        ]);
+        let brokers = make_brokers_with_racks(&[(1, "rack-a"), (2, "rack-a"), (3, "rack-b")]);
 
-        let result = PartitionAllocator::allocate(
-            "test", 3, 3, &brokers, AllocationStrategy::RackAware,
-        ).unwrap();
+        let result =
+            PartitionAllocator::allocate("test", 3, 3, &brokers, AllocationStrategy::RackAware)
+                .unwrap();
 
         // 应该回退到 round-robin 但仍然成功
         assert_eq!(result.assignments.len(), 3);
@@ -419,17 +419,20 @@ mod tests {
 
     #[test]
     fn test_rack_aware_rf_2() {
-        let brokers = make_brokers_with_racks(&[
-            (1, "rack-a"), (2, "rack-b"), (3, "rack-c"),
-        ]);
+        let brokers = make_brokers_with_racks(&[(1, "rack-a"), (2, "rack-b"), (3, "rack-c")]);
 
-        let result = PartitionAllocator::allocate(
-            "test", 6, 2, &brokers, AllocationStrategy::RackAware,
-        ).unwrap();
+        let result =
+            PartitionAllocator::allocate("test", 6, 2, &brokers, AllocationStrategy::RackAware)
+                .unwrap();
 
         // 每个 partition 的 2 个副本应该在不同机架
         for (pid, replicas) in &result.assignments {
-            assert_eq!(replicas.len(), 2, "Partition {} should have 2 replicas", pid);
+            assert_eq!(
+                replicas.len(),
+                2,
+                "Partition {} should have 2 replicas",
+                pid
+            );
         }
     }
 
@@ -437,18 +440,16 @@ mod tests {
 
     #[test]
     fn test_no_brokers() {
-        let result = PartitionAllocator::allocate(
-            "test", 3, 1, &[], AllocationStrategy::RoundRobin,
-        );
+        let result =
+            PartitionAllocator::allocate("test", 3, 1, &[], AllocationStrategy::RoundRobin);
         assert_eq!(result, Err(AllocationError::NoBrokersAvailable));
     }
 
     #[test]
     fn test_insufficient_brokers() {
         let brokers = make_brokers(&[1, 2]);
-        let result = PartitionAllocator::allocate(
-            "test", 3, 3, &brokers, AllocationStrategy::RoundRobin,
-        );
+        let result =
+            PartitionAllocator::allocate("test", 3, 3, &brokers, AllocationStrategy::RoundRobin);
         assert_eq!(
             result,
             Err(AllocationError::InsufficientBrokers {
@@ -461,9 +462,8 @@ mod tests {
     #[test]
     fn test_zero_partitions() {
         let brokers = make_brokers(&[1, 2, 3]);
-        let result = PartitionAllocator::allocate(
-            "test", 0, 1, &brokers, AllocationStrategy::RoundRobin,
-        );
+        let result =
+            PartitionAllocator::allocate("test", 0, 1, &brokers, AllocationStrategy::RoundRobin);
         assert_eq!(result, Err(AllocationError::InvalidPartitions(0)));
     }
 
@@ -472,13 +472,17 @@ mod tests {
     #[test]
     fn test_imbalance_score_balanced() {
         let brokers = make_brokers(&[1, 2, 3]);
-        let result = PartitionAllocator::allocate(
-            "test", 6, 1, &brokers, AllocationStrategy::RoundRobin,
-        ).unwrap();
+        let result =
+            PartitionAllocator::allocate("test", 6, 1, &brokers, AllocationStrategy::RoundRobin)
+                .unwrap();
 
         let score = PartitionAllocator::imbalance_score(&result, &[1, 2, 3]);
         // 完全均衡: 每个 broker 2 个 partition
-        assert!(score < 0.01, "Imbalance score should be near 0 for balanced: {}", score);
+        assert!(
+            score < 0.01,
+            "Imbalance score should be near 0 for balanced: {}",
+            score
+        );
     }
 
     #[test]
@@ -543,14 +547,24 @@ mod tests {
         let brokers = make_brokers(&broker_ids);
 
         let result = PartitionAllocator::allocate(
-            "large-topic", 20, 3, &brokers, AllocationStrategy::RoundRobin,
-        ).unwrap();
+            "large-topic",
+            20,
+            3,
+            &brokers,
+            AllocationStrategy::RoundRobin,
+        )
+        .unwrap();
 
         assert_eq!(result.assignments.len(), 20);
 
         // 验证每个 partition 有 3 个不同的副本
         for (pid, replicas) in &result.assignments {
-            assert_eq!(replicas.len(), 3, "Partition {} should have 3 replicas", pid);
+            assert_eq!(
+                replicas.len(),
+                3,
+                "Partition {} should have 3 replicas",
+                pid
+            );
             let mut unique = replicas.clone();
             unique.sort();
             unique.dedup();
@@ -562,14 +576,17 @@ mod tests {
     fn test_3_rack_3_replica_scenario() {
         // 经典场景: 3 机架，3 副本，6 分区
         let brokers = make_brokers_with_racks(&[
-            (1, "rack-a"), (2, "rack-a"),
-            (3, "rack-b"), (4, "rack-b"),
-            (5, "rack-c"), (6, "rack-c"),
+            (1, "rack-a"),
+            (2, "rack-a"),
+            (3, "rack-b"),
+            (4, "rack-b"),
+            (5, "rack-c"),
+            (6, "rack-c"),
         ]);
 
-        let result = PartitionAllocator::allocate(
-            "test", 6, 3, &brokers, AllocationStrategy::RackAware,
-        ).unwrap();
+        let result =
+            PartitionAllocator::allocate("test", 6, 3, &brokers, AllocationStrategy::RackAware)
+                .unwrap();
 
         assert_eq!(result.assignments.len(), 6);
 

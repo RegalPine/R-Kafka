@@ -3,10 +3,10 @@
 //! Broker 定期向 Controller 发送心跳，保持注册状态。
 //! Controller 通过心跳检测 Broker 存活，并返回待执行的指令。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ─────────────────────────────────────────────────────────
 
@@ -83,11 +83,11 @@ mod tests {
     fn test_broker_heartbeat_request_decode() {
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
-        w.write_i32(1);       // broker_id
-        w.write_i64(42);      // broker_epoch
-        w.write_bool(false);  // want_fence
-        w.write_bool(false);  // want_shut_down
-        w.write_i64(1000);    // current_metadata_offset
+        w.write_i32(1); // broker_id
+        w.write_i64(42); // broker_epoch
+        w.write_bool(false); // want_fence
+        w.write_bool(false); // want_shut_down
+        w.write_i64(1000); // current_metadata_offset
         w.write_tagged_fields(&[]);
 
         let mut reader = KafkaReader::new(&buf);
@@ -131,11 +131,11 @@ mod tests {
     fn test_broker_heartbeat_shutdown_request() {
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
-        w.write_i32(3);       // broker_id
-        w.write_i64(10);      // broker_epoch
-        w.write_bool(false);  // want_fence
-        w.write_bool(true);   // want_shut_down (优雅关闭)
-        w.write_i64(500);     // current_metadata_offset
+        w.write_i32(3); // broker_id
+        w.write_i64(10); // broker_epoch
+        w.write_bool(false); // want_fence
+        w.write_bool(true); // want_shut_down (优雅关闭)
+        w.write_i64(500); // current_metadata_offset
         w.write_tagged_fields(&[]);
 
         let mut reader = KafkaReader::new(&buf);

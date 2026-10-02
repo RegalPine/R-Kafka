@@ -466,7 +466,9 @@ mod tests {
 
         // 从接收端读取并验证
         let mut received = vec![0u8; test_data.len()];
-        receiver.set_read_timeout(Some(std::time::Duration::from_secs(2))).unwrap();
+        receiver
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
         let mut total_read = 0;
         while total_read < received.len() {
             match receiver.read(&mut received[total_read..]) {
@@ -506,7 +508,9 @@ mod tests {
         assert_eq!(sent, 50);
 
         let mut received = vec![0u8; 50];
-        receiver.set_read_timeout(Some(std::time::Duration::from_secs(2))).unwrap();
+        receiver
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
         let mut total_read = 0;
         while total_read < 50 {
             match receiver.read(&mut received[total_read..]) {

@@ -3,10 +3,10 @@
 //! 消费者提交偏移量到 Broker。
 //! Phase 1: 内存存储 + 可选持久化到 __consumer_offsets 内部 topic。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -77,11 +77,7 @@ impl KafkaRequestDecoder for OffsetCommitRequest {
             // Legacy v0-v7
             let group_id = reader.read_string()?;
 
-            let generation_id = if version >= 1 {
-                reader.read_i32()?
-            } else {
-                -1
-            };
+            let generation_id = if version >= 1 { reader.read_i32()? } else { -1 };
 
             let member_id = if version >= 1 {
                 reader.read_string()?
@@ -96,7 +92,7 @@ impl KafkaRequestDecoder for OffsetCommitRequest {
             };
 
             // v1-v4: retention_time_ms
-            let retention_time_ms = if version >= 1 && version <= 4 {
+            let retention_time_ms = if (1..=4).contains(&version) {
                 reader.read_i64()?
             } else {
                 -1
@@ -108,11 +104,7 @@ impl KafkaRequestDecoder for OffsetCommitRequest {
                     let index = r2.read_i32()?;
                     let offset = r2.read_i64()?;
 
-                    let committed_leader_epoch = if version >= 6 {
-                        r2.read_i32()?
-                    } else {
-                        -1
-                    };
+                    let committed_leader_epoch = if version >= 6 { r2.read_i32()? } else { -1 };
 
                     // v1: timestamp; v2-v4: removed; v5+: re-added
                     let commit_timestamp = if version == 1 || version >= 5 {

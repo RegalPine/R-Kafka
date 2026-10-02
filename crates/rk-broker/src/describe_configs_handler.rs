@@ -24,7 +24,12 @@ const TOPIC_DEFAULT_CONFIGS: &[(&str, &str, bool, bool)] = &[
     ("max.message.bytes", "1048588", true, false),
     ("message.downconversion.enable", "true", true, false),
     ("message.format.version", "3.0-IV1", true, false),
-    ("message.timestamp.difference.max.ms", "9223372036854775807", true, false),
+    (
+        "message.timestamp.difference.max.ms",
+        "9223372036854775807",
+        true,
+        false,
+    ),
     ("message.timestamp.type", "CreateTime", true, false),
     ("min.cleanable.dirty.ratio", "0.5", true, false),
     ("min.compaction.lag.ms", "0", true, false),
@@ -75,7 +80,8 @@ impl DescribeConfigsHandler {
 
         for resource in &request.resources {
             match resource.resource_type {
-                2 => { // Topic
+                2 => {
+                    // Topic
                     let configs = self.describe_topic_config(
                         &resource.resource_name,
                         resource.config_names.as_deref(),
@@ -88,7 +94,8 @@ impl DescribeConfigsHandler {
                         configs,
                     });
                 }
-                4 => { // Broker
+                4 => {
+                    // Broker
                     let configs = self.describe_broker_config(
                         &resource.resource_name,
                         resource.config_names.as_deref(),
@@ -104,7 +111,10 @@ impl DescribeConfigsHandler {
                 _ => {
                     response_resources.push(DescribeConfigsResponseResource {
                         error_code: KafkaErrorCode::InvalidRequest,
-                        error_message: Some(format!("Unsupported resource type: {}", resource.resource_type)),
+                        error_message: Some(format!(
+                            "Unsupported resource type: {}",
+                            resource.resource_type
+                        )),
                         resource_type: resource.resource_type,
                         resource_name: resource.resource_name.clone(),
                         configs: vec![],
@@ -196,7 +206,11 @@ mod tests {
 
     fn make_handler() -> DescribeConfigsHandler {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test-topic", 1);
         DescribeConfigsHandler::new(pm)
     }
@@ -217,7 +231,10 @@ mod tests {
         assert_eq!(response.resources[0].error_code, KafkaErrorCode::None);
         assert!(!response.resources[0].configs.is_empty());
         // 应包含 retention.ms
-        assert!(response.resources[0].configs.iter().any(|c| c.name == "retention.ms"));
+        assert!(response.resources[0]
+            .configs
+            .iter()
+            .any(|c| c.name == "retention.ms"));
     }
 
     #[test]
@@ -227,7 +244,10 @@ mod tests {
             resources: vec![DescribeConfigsRequestResource {
                 resource_type: 2,
                 resource_name: "test-topic".to_string(),
-                config_names: Some(vec!["retention.ms".to_string(), "retention.bytes".to_string()]),
+                config_names: Some(vec![
+                    "retention.ms".to_string(),
+                    "retention.bytes".to_string(),
+                ]),
             }],
             include_synonyms: false,
         };
@@ -239,7 +259,9 @@ mod tests {
     fn test_describe_topic_with_override() {
         let handler = make_handler();
         // 设置覆盖
-        handler.partition_manager.set_topic_config("test-topic", "retention.ms", "3600000");
+        handler
+            .partition_manager
+            .set_topic_config("test-topic", "retention.ms", "3600000");
 
         let request = DescribeConfigsRequest {
             resources: vec![DescribeConfigsRequestResource {
@@ -284,6 +306,9 @@ mod tests {
             include_synonyms: false,
         };
         let response = handler.handle(request, 0).unwrap();
-        assert_eq!(response.resources[0].error_code, KafkaErrorCode::InvalidRequest);
+        assert_eq!(
+            response.resources[0].error_code,
+            KafkaErrorCode::InvalidRequest
+        );
     }
 }

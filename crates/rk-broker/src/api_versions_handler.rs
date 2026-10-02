@@ -7,6 +7,7 @@ use rk_core::error::Result;
 use rk_protocol::api_versions::{ApiVersionsRequest, ApiVersionsResponse};
 
 /// ApiVersions 请求处理器
+#[derive(Default)]
 pub struct ApiVersionsHandler;
 
 impl ApiVersionsHandler {
@@ -39,15 +40,18 @@ mod tests {
             client_software_version: None,
         };
         let response = handler.handle(request, 0).unwrap();
-        assert_eq!(response.error_code, rk_protocol::error_codes::KafkaErrorCode::None);
+        assert_eq!(
+            response.error_code,
+            rk_protocol::error_codes::KafkaErrorCode::None
+        );
         assert!(!response.api_versions.is_empty());
 
         // 验证关键 API 存在
         let api_keys: Vec<i16> = response.api_versions.iter().map(|av| av.api_key).collect();
-        assert!(api_keys.contains(&0));  // Produce
-        assert!(api_keys.contains(&1));  // Fetch
-        assert!(api_keys.contains(&2));  // ListOffsets
-        assert!(api_keys.contains(&3));  // Metadata
+        assert!(api_keys.contains(&0)); // Produce
+        assert!(api_keys.contains(&1)); // Fetch
+        assert!(api_keys.contains(&2)); // ListOffsets
+        assert!(api_keys.contains(&3)); // Metadata
         assert!(api_keys.contains(&18)); // ApiVersions
         assert!(api_keys.contains(&19)); // CreateTopics
         assert!(api_keys.contains(&20)); // DeleteTopics
@@ -61,7 +65,10 @@ mod tests {
             client_software_version: Some("1.0.0".to_string()),
         };
         let response = handler.handle(request, 3).unwrap();
-        assert_eq!(response.error_code, rk_protocol::error_codes::KafkaErrorCode::None);
+        assert_eq!(
+            response.error_code,
+            rk_protocol::error_codes::KafkaErrorCode::None
+        );
         assert!(!response.api_versions.is_empty());
     }
 }

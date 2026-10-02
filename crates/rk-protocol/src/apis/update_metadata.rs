@@ -2,10 +2,10 @@
 //!
 //! Controller 发送: 广播 Metadata 变更给所有 Broker。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 #[derive(Debug, Clone)]
 pub struct UpdateMetadataBroker {
@@ -32,10 +32,18 @@ impl KafkaRequestDecoder for UpdateMetadataRequest {
             let host = reader.read_compact_string()?;
             let port = reader.read_i32()?;
             let _tags = reader.read_tagged_fields()?;
-            brokers.push(UpdateMetadataBroker { broker_id, host, port });
+            brokers.push(UpdateMetadataBroker {
+                broker_id,
+                host,
+                port,
+            });
         }
         let _tags = reader.read_tagged_fields()?;
-        Ok(Self { controller_id, controller_epoch, brokers })
+        Ok(Self {
+            controller_id,
+            controller_epoch,
+            brokers,
+        })
     }
 }
 
@@ -63,11 +71,17 @@ mod tests {
     fn test_update_metadata_request_decode() {
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
-        w.write_i32(1);   // controller_id
-        w.write_i32(3);   // controller_epoch
-        w.write_i32(2);   // 2 brokers
-        w.write_i32(1); w.write_compact_string("host1"); w.write_i32(9092); w.write_tagged_fields(&[]);
-        w.write_i32(2); w.write_compact_string("host2"); w.write_i32(9093); w.write_tagged_fields(&[]);
+        w.write_i32(1); // controller_id
+        w.write_i32(3); // controller_epoch
+        w.write_i32(2); // 2 brokers
+        w.write_i32(1);
+        w.write_compact_string("host1");
+        w.write_i32(9092);
+        w.write_tagged_fields(&[]);
+        w.write_i32(2);
+        w.write_compact_string("host2");
+        w.write_i32(9093);
+        w.write_tagged_fields(&[]);
         w.write_tagged_fields(&[]);
 
         let mut reader = KafkaReader::new(&buf);

@@ -3,10 +3,10 @@
 //! SASL 认证交换: 客户端发送认证数据，Broker 验证后返回结果。
 //! v0: legacy, v1+: flexible (KIP-482) + session_lifetime_ms
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -117,7 +117,9 @@ mod tests {
     #[test]
     fn test_sasl_authenticate_request_v0_roundtrip() {
         let auth_bytes = b"\0admin\0secret".to_vec();
-        let _req = SaslAuthenticateRequest { auth_bytes: auth_bytes.clone() };
+        let _req = SaslAuthenticateRequest {
+            auth_bytes: auth_bytes.clone(),
+        };
 
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
@@ -132,7 +134,9 @@ mod tests {
     #[test]
     fn test_sasl_authenticate_request_v2_flexible_roundtrip() {
         let auth_bytes = b"\0admin\0password".to_vec();
-        let _req = SaslAuthenticateRequest { auth_bytes: auth_bytes.clone() };
+        let _req = SaslAuthenticateRequest {
+            auth_bytes: auth_bytes.clone(),
+        };
 
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);

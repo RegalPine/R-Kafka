@@ -17,7 +17,11 @@ pub struct FindCoordinatorHandler {
 
 impl FindCoordinatorHandler {
     pub fn new(broker_id: i32, host: String, port: i32) -> Self {
-        Self { broker_id, host, port }
+        Self {
+            broker_id,
+            host,
+            port,
+        }
     }
 
     /// 处理 FindCoordinator 请求
@@ -112,10 +116,7 @@ mod tests {
         let request = FindCoordinatorRequest {
             key: "my-group".to_string(),
             key_type: 0,
-            coordinator_keys: Some(vec![
-                "group-a".to_string(),
-                "group-b".to_string(),
-            ]),
+            coordinator_keys: Some(vec!["group-a".to_string(), "group-b".to_string()]),
         };
         let response = handler.handle(request, 4).unwrap();
         let coordinators = response.coordinators.unwrap();

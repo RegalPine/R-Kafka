@@ -3,10 +3,10 @@
 //! 列出当前活跃的事务。
 //! KIP-664, v0+ 全部为 Flexible 格式。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -24,7 +24,10 @@ impl KafkaRequestDecoder for ListTransactionsRequest {
         let transactional_id_prefixes = reader.read_compact_array(|r| r.read_compact_string())?;
         let states = reader.read_compact_array(|r| r.read_compact_string())?;
         let _tags = reader.read_tagged_fields();
-        Ok(Self { transactional_id_prefixes, states })
+        Ok(Self {
+            transactional_id_prefixes,
+            states,
+        })
     }
 }
 

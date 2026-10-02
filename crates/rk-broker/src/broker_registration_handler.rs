@@ -5,12 +5,22 @@ use rk_protocol::apis::broker_registration::*;
 use rk_protocol::error_codes::KafkaErrorCode;
 use tracing::info;
 
-pub struct BrokerRegistrationHandler { _broker_id: i32 }
+pub struct BrokerRegistrationHandler {
+    _broker_id: i32,
+}
 
 impl BrokerRegistrationHandler {
-    pub fn new(broker_id: i32) -> Self { Self { _broker_id: broker_id } }
+    pub fn new(broker_id: i32) -> Self {
+        Self {
+            _broker_id: broker_id,
+        }
+    }
 
-    pub fn handle(&self, request: BrokerRegistrationRequest, _version: i16) -> Result<BrokerRegistrationResponse> {
+    pub fn handle(
+        &self,
+        request: BrokerRegistrationRequest,
+        _version: i16,
+    ) -> Result<BrokerRegistrationResponse> {
         info!(
             broker_id = request.broker_id,
             cluster_id = %request.cluster_id,

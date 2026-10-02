@@ -3,10 +3,10 @@
 //! 创建 Topic: 指定分区数、副本因子和配置。
 //! Phase 1: 单副本，仅支持 partition_count + replication_factor=1。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -54,7 +54,10 @@ impl KafkaRequestDecoder for CreateTopicsRequest {
                 let assignments = r.read_compact_array(|r| {
                     let partition_id = r.read_i32()?;
                     let broker_ids = r.read_compact_array(|r| r.read_i32())?;
-                    Ok(CreateTopicsRequestAssignment { partition_id, broker_ids })
+                    Ok(CreateTopicsRequestAssignment {
+                        partition_id,
+                        broker_ids,
+                    })
                 })?;
                 let configs = r.read_compact_array(|r| {
                     let key = r.read_compact_string()?;
@@ -63,7 +66,11 @@ impl KafkaRequestDecoder for CreateTopicsRequest {
                 })?;
                 let _tags = r.read_tagged_fields()?;
                 Ok(CreateTopicsRequestTopic {
-                    name, num_partitions, replication_factor, assignments, configs,
+                    name,
+                    num_partitions,
+                    replication_factor,
+                    assignments,
+                    configs,
                 })
             })?
         } else {
@@ -74,7 +81,10 @@ impl KafkaRequestDecoder for CreateTopicsRequest {
                 let assignments = r.read_array(|r| {
                     let partition_id = r.read_i32()?;
                     let broker_ids = r.read_array(|r| r.read_i32())?;
-                    Ok(CreateTopicsRequestAssignment { partition_id, broker_ids })
+                    Ok(CreateTopicsRequestAssignment {
+                        partition_id,
+                        broker_ids,
+                    })
                 })?;
                 let configs = r.read_array(|r| {
                     let key = r.read_string()?;
@@ -82,7 +92,11 @@ impl KafkaRequestDecoder for CreateTopicsRequest {
                     Ok(CreateTopicsRequestConfig { key, value })
                 })?;
                 Ok(CreateTopicsRequestTopic {
-                    name, num_partitions, replication_factor, assignments, configs,
+                    name,
+                    num_partitions,
+                    replication_factor,
+                    assignments,
+                    configs,
                 })
             })?
         };
@@ -99,7 +113,11 @@ impl KafkaRequestDecoder for CreateTopicsRequest {
             let _tags = reader.read_tagged_fields()?;
         }
 
-        Ok(Self { topics, timeout_ms, validate_only })
+        Ok(Self {
+            topics,
+            timeout_ms,
+            validate_only,
+        })
     }
 }
 
@@ -168,13 +186,11 @@ mod tests {
 
     #[test]
     fn test_create_topics_response_encode_v0() {
-        let resp = CreateTopicsResponse::success(vec![
-            CreateTopicsResponseTopic {
-                name: "test".to_string(),
-                error_code: KafkaErrorCode::None,
-                error_message: None,
-            },
-        ]);
+        let resp = CreateTopicsResponse::success(vec![CreateTopicsResponseTopic {
+            name: "test".to_string(),
+            error_code: KafkaErrorCode::None,
+            error_message: None,
+        }]);
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
         resp.encode(&mut w, 0).unwrap();
@@ -183,13 +199,11 @@ mod tests {
 
     #[test]
     fn test_create_topics_response_encode_v1() {
-        let resp = CreateTopicsResponse::success(vec![
-            CreateTopicsResponseTopic {
-                name: "test".to_string(),
-                error_code: KafkaErrorCode::TopicAlreadyExists,
-                error_message: Some("already exists".to_string()),
-            },
-        ]);
+        let resp = CreateTopicsResponse::success(vec![CreateTopicsResponseTopic {
+            name: "test".to_string(),
+            error_code: KafkaErrorCode::TopicAlreadyExists,
+            error_message: Some("already exists".to_string()),
+        }]);
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
         resp.encode(&mut w, 1).unwrap();

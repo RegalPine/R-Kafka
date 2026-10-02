@@ -43,26 +43,27 @@
 //! let result = producer.send("my-topic", Some(b"key"), b"value").await?;
 //! ```
 
-pub mod error;
-pub mod config;
-pub mod connection;
-pub mod metadata;
-pub mod producer;
-pub mod consumer;
 pub mod admin;
 pub mod assignor;
+pub mod config;
+pub mod connection;
+pub mod consumer;
+pub mod error;
+pub mod metadata;
+pub mod producer;
 
 // Re-exports
-pub use error::{ClientError, ClientResult};
-pub use config::{ClientConfig, ProducerConfig, ConsumerConfig, CompressionType, OffsetReset};
-pub use connection::{BrokerConnection, ConnectionPool};
-pub use metadata::{MetadataCache, TopicPartition, PartitionLeader, BrokerEndpoint};
-pub use producer::{KafkaProducer, ProducerRecord, RecordMetadata, Partitioner, DefaultPartitioner};
-pub use consumer::{KafkaConsumer, ConsumerRecord};
-pub use admin::{KafkaAdmin, TopicInfo, PartitionInfo, NewTopic};
+pub use admin::{KafkaAdmin, NewTopic, PartitionInfo, TopicInfo};
 pub use assignor::{
-    PartitionAssignor, MemberSubscription, AssignmentResult,
-    RangeAssignor, RoundRobinAssignor, CooperativeStickyAssignor,
-    RANGE_ASSIGNOR, ROUNDROBIN_ASSIGNOR, COOPERATIVE_STICKY_ASSIGNOR,
-    get_assignor, select_protocol,
+    get_assignor, select_protocol, AssignmentResult, CooperativeStickyAssignor, MemberSubscription,
+    PartitionAssignor, RangeAssignor, RoundRobinAssignor, COOPERATIVE_STICKY_ASSIGNOR,
+    RANGE_ASSIGNOR, ROUNDROBIN_ASSIGNOR,
+};
+pub use config::{ClientConfig, CompressionType, ConsumerConfig, OffsetReset, ProducerConfig};
+pub use connection::{BrokerConnection, ConnectionPool};
+pub use consumer::{ConsumerRecord, KafkaConsumer};
+pub use error::{ClientError, ClientResult};
+pub use metadata::{BrokerEndpoint, MetadataCache, PartitionLeader, TopicPartition};
+pub use producer::{
+    DefaultPartitioner, KafkaProducer, Partitioner, ProducerRecord, RecordMetadata,
 };

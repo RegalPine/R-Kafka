@@ -3,10 +3,10 @@
 //! 消费者查询已提交的偏移量。
 //! Phase 1: 从内存 OffsetManager 读取。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -50,7 +50,11 @@ impl KafkaRequestDecoder for OffsetFetchRequest {
                             partition_indexes: partitions,
                         })
                     })?;
-                    if arr.is_empty() { None } else { Some(arr) }
+                    if arr.is_empty() {
+                        None
+                    } else {
+                        Some(arr)
+                    }
                 } else {
                     None
                 };
@@ -84,7 +88,11 @@ impl KafkaRequestDecoder for OffsetFetchRequest {
                         partition_indexes: partitions,
                     })
                 })?;
-                if arr.is_empty() { None } else { Some(arr) }
+                if arr.is_empty() {
+                    None
+                } else {
+                    Some(arr)
+                }
             };
 
             let require_stable = if version >= 7 {
@@ -169,7 +177,7 @@ impl KafkaResponseEncoder for OffsetFetchResponse {
             } else {
                 // Convert single-group to multi-group format
                 writer.write_unsigned_varint(2); // array len+1 = 2
-                writer.write_compact_string(&""); // group_id placeholder
+                writer.write_compact_string(""); // group_id placeholder
                 writer.write_compact_array(&self.topics, |w2, t| {
                     w2.write_compact_string(&t.name);
                     w2.write_compact_array(&t.partitions, |w3, p| {

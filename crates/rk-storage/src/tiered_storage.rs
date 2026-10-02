@@ -42,7 +42,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 
 // ─── RemoteStorage Trait ──────────────────────────────────
 
@@ -61,22 +61,13 @@ pub trait RemoteStorage: Send + Sync {
     ) -> Result<RemoteSegmentHandle>;
 
     /// 从远程存储下载 segment 数据
-    fn fetch_segment(
-        &self,
-        handle: &RemoteSegmentHandle,
-    ) -> Result<Vec<u8>>;
+    fn fetch_segment(&self, handle: &RemoteSegmentHandle) -> Result<Vec<u8>>;
 
     /// 删除远程 segment
-    fn delete_segment(
-        &self,
-        handle: &RemoteSegmentHandle,
-    ) -> Result<()>;
+    fn delete_segment(&self, handle: &RemoteSegmentHandle) -> Result<()>;
 
     /// 检查 segment 是否存在
-    fn segment_exists(
-        &self,
-        handle: &RemoteSegmentHandle,
-    ) -> Result<bool>;
+    fn segment_exists(&self, handle: &RemoteSegmentHandle) -> Result<bool>;
 
     /// 获取远程存储统计
     fn stats(&self) -> Result<RemoteStorageStats>;
@@ -137,10 +128,7 @@ impl LocalFsRemoteStorage {
     pub fn new(base_dir: impl Into<PathBuf>) -> Result<Self> {
         let base_dir = base_dir.into();
         std::fs::create_dir_all(&base_dir).map_err(|e| {
-            RkError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to create remote storage dir: {}", e),
-            ))
+            RkError::Io(std::io::Error::other(format!("Failed to create remote storage dir: {}", e)))
         })?;
         info!(?base_dir, "LocalFsRemoteStorage initialized");
         Ok(Self {
@@ -180,17 +168,11 @@ impl RemoteStorage for LocalFsRemoteStorage {
         let path = self.segment_path(topic, partition, base_offset);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                RkError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to create dir: {}", e),
-                ))
+                RkError::Io(std::io::Error::other(format!("Failed to create dir: {}", e)))
             })?;
         }
         std::fs::write(&path, data).map_err(|e| {
-            RkError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to write segment: {}", e),
-            ))
+            RkError::Io(std::io::Error::other(format!("Failed to write segment: {}", e)))
         })?;
 
         let relative_key = path
@@ -215,10 +197,7 @@ impl RemoteStorage for LocalFsRemoteStorage {
     fn fetch_segment(&self, handle: &RemoteSegmentHandle) -> Result<Vec<u8>> {
         let path = self.handle_path(handle);
         let data = std::fs::read(&path).map_err(|e| {
-            RkError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to read remote segment: {}", e),
-            ))
+            RkError::Io(std::io::Error::other(format!("Failed to read remote segment: {}", e)))
         })?;
         self.fetch_count.fetch_add(1, Ordering::Relaxed);
         debug!(key = %handle.key, size = data.len(), "Segment fetched from remote");
@@ -229,10 +208,7 @@ impl RemoteStorage for LocalFsRemoteStorage {
         let path = self.handle_path(handle);
         if path.exists() {
             std::fs::remove_file(&path).map_err(|e| {
-                RkError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to delete remote segment: {}", e),
-                ))
+                RkError::Io(std::io::Error::other(format!("Failed to delete remote segment: {}", e)))
             })?;
         }
         self.delete_count.fetch_add(1, Ordering::Relaxed);
@@ -344,7 +320,12 @@ impl RemoteLogManifest {
     }
 
     /// 移除远程 segment 记录
-    pub fn remove_segment(&mut self, topic: &str, partition: u32, base_offset: u64) -> Option<RemoteSegmentMeta> {
+    pub fn remove_segment(
+        &mut self,
+        topic: &str,
+        partition: u32,
+        base_offset: u64,
+    ) -> Option<RemoteSegmentMeta> {
         let key = (topic.to_string(), partition);
         if let Some(segments) = self.segments.get_mut(&key) {
             if let Ok(idx) = segments.binary_search_by(|s| s.base_offset.cmp(&base_offset)) {
@@ -360,7 +341,12 @@ impl RemoteLogManifest {
     }
 
     /// 查找包含指定 offset 的远程 segment
-    pub fn find_segment(&self, topic: &str, partition: u32, offset: u64) -> Option<&RemoteSegmentMeta> {
+    pub fn find_segment(
+        &self,
+        topic: &str,
+        partition: u32,
+        offset: u64,
+    ) -> Option<&RemoteSegmentMeta> {
         let key = (topic.to_string(), partition);
         self.segments.get(&key).and_then(|segments| {
             // 找到 base_offset <= offset 的最后一个 segment
@@ -528,12 +514,7 @@ impl TieredStorageManager {
     }
 
     /// 提交迁移任务
-    pub fn submit_migration(
-        &self,
-        topic: &str,
-        partition: u32,
-        base_offset: u64,
-    ) -> Result<()> {
+    pub fn submit_migration(&self, topic: &str, partition: u32, base_offset: u64) -> Result<()> {
         if !self.config.enabled {
             return Ok(());
         }
@@ -547,12 +528,7 @@ impl TieredStorageManager {
             completed_at_ms: None,
         };
 
-        debug!(
-            topic,
-            partition,
-            base_offset,
-            "Migration task submitted"
-        );
+        debug!(topic, partition, base_offset, "Migration task submitted");
         self.pending_migrations.lock().unwrap().push(task);
         Ok(())
     }
@@ -568,9 +544,7 @@ impl TieredStorageManager {
         data: &[u8],
     ) -> Result<RemoteSegmentHandle> {
         if !self.config.enabled {
-            return Err(RkError::Config(
-                "Tiered storage is not enabled".to_string(),
-            ));
+            return Err(RkError::Config("Tiered storage is not enabled".to_string()));
         }
 
         // 更新 pending task 状态
@@ -588,7 +562,10 @@ impl TieredStorageManager {
         }
 
         // 上传到远程存储
-        match self.storage.upload_segment(topic, partition, base_offset, data) {
+        match self
+            .storage
+            .upload_segment(topic, partition, base_offset, data)
+        {
             Ok(handle) => {
                 // 添加到 manifest
                 let meta = RemoteSegmentMeta {
@@ -688,12 +665,7 @@ impl TieredStorageManager {
         let mut manifest = self.manifest.lock().unwrap();
         if let Some(meta) = manifest.remove_segment(topic, partition, base_offset) {
             self.storage.delete_segment(&meta.handle)?;
-            info!(
-                topic,
-                partition,
-                base_offset,
-                "Remote segment deleted"
-            );
+            info!(topic, partition, base_offset, "Remote segment deleted");
             Ok(())
         } else {
             Err(RkError::InvalidRequest(format!(
@@ -704,10 +676,7 @@ impl TieredStorageManager {
     }
 
     /// 处理所有 pending 迁移任务 (批量执行)
-    pub fn process_pending_migrations<F>(
-        &self,
-        data_provider: F,
-    ) -> Result<usize>
+    pub fn process_pending_migrations<F>(&self, data_provider: F) -> Result<usize>
     where
         F: Fn(&str, u32, u64) -> Option<(u64, i64, Vec<u8>)>,
     {
@@ -836,9 +805,7 @@ mod tests {
         let storage = LocalFsRemoteStorage::new(tmp.path()).unwrap();
 
         let data = b"hello tiered storage";
-        let handle = storage
-            .upload_segment("topic-a", 0, 100, data)
-            .unwrap();
+        let handle = storage.upload_segment("topic-a", 0, 100, data).unwrap();
 
         assert_eq!(handle.backend, "local");
         assert_eq!(handle.size_bytes, data.len() as u64);
@@ -857,9 +824,7 @@ mod tests {
         let storage = LocalFsRemoteStorage::new(tmp.path()).unwrap();
 
         let data = b"delete me";
-        let handle = storage
-            .upload_segment("topic-b", 1, 200, data)
-            .unwrap();
+        let handle = storage.upload_segment("topic-b", 1, 200, data).unwrap();
 
         assert!(storage.segment_exists(&handle).unwrap());
         storage.delete_segment(&handle).unwrap();
@@ -871,15 +836,9 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let storage = LocalFsRemoteStorage::new(tmp.path()).unwrap();
 
-        storage
-            .upload_segment("t1", 0, 0, b"seg0")
-            .unwrap();
-        storage
-            .upload_segment("t1", 0, 100, b"seg100")
-            .unwrap();
-        storage
-            .upload_segment("t1", 1, 0, b"p1-seg0")
-            .unwrap();
+        storage.upload_segment("t1", 0, 0, b"seg0").unwrap();
+        storage.upload_segment("t1", 0, 100, b"seg100").unwrap();
+        storage.upload_segment("t1", 1, 0, b"p1-seg0").unwrap();
 
         let stats = storage.stats().unwrap();
         assert_eq!(stats.total_segments, 3);
@@ -892,8 +851,12 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let storage = LocalFsRemoteStorage::new(tmp.path()).unwrap();
 
-        let h1 = storage.upload_segment("orders", 0, 0, b"orders-data").unwrap();
-        let h2 = storage.upload_segment("payments", 0, 0, b"payments-data").unwrap();
+        let h1 = storage
+            .upload_segment("orders", 0, 0, b"orders-data")
+            .unwrap();
+        let h2 = storage
+            .upload_segment("payments", 0, 0, b"payments-data")
+            .unwrap();
 
         assert_ne!(h1.key, h2.key);
         assert_eq!(storage.fetch_segment(&h1).unwrap(), b"orders-data");
@@ -974,11 +937,7 @@ mod tests {
 
         for i in 0..3 {
             let base = i * 100;
-            let handle = RemoteSegmentHandle::new(
-                "local",
-                &format!("t/0/{:020}.log", base),
-                100,
-            );
+            let handle = RemoteSegmentHandle::new("local", &format!("t/0/{:020}.log", base), 100);
             manifest.add_segment(RemoteSegmentMeta {
                 base_offset: base,
                 max_offset: base + 99,
@@ -1060,9 +1019,7 @@ mod tests {
             .migrate_segment("events", 1, 500, 599, 2000, data)
             .unwrap();
 
-        let fetched = manager
-            .fetch_remote_segment("events", 1, 550)
-            .unwrap();
+        let fetched = manager.fetch_remote_segment("events", 1, 550).unwrap();
         assert_eq!(fetched, data);
     }
 

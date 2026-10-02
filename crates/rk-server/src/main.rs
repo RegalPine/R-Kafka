@@ -5,9 +5,9 @@
 //!        + BrokerRouter + TCP Server + HTTP Metrics Server + Graceful Shutdown
 //!        + ConfigReloader (SIGHUP) + Startup Banner
 
+use clap::Parser;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use clap::Parser;
 use tokio::sync::watch;
 use tracing::info;
 
@@ -99,7 +99,10 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     // 加载配置
-    let config = rk_core::BrokerConfig::from_file(&cli.config)?;
+    let mut config = rk_core::BrokerConfig::from_file(&cli.config)?;
+
+    // 环境变量覆盖 (12-Factor: 配置从环境中注入)
+    config.apply_env_overrides();
 
     // 打印启动 Banner
     print_banner(&config);
@@ -155,10 +158,8 @@ async fn main() -> anyhow::Result<()> {
     // 初始化 OffsetManager + PersistentOffsetManager
     let offset_manager = Arc::new(rk_broker::OffsetManager::new(None));
     let persist_dir = data_dir.join("offsets");
-    let persistent_offset_manager = rk_broker::PersistentOffsetManager::new(
-        offset_manager.clone(),
-        persist_dir,
-    );
+    let persistent_offset_manager =
+        rk_broker::PersistentOffsetManager::new(offset_manager.clone(), persist_dir);
     // 从磁盘恢复偏移量
     if let Err(e) = persistent_offset_manager.load_from_disk() {
         tracing::warn!(error = %e, "Failed to load offset snapshot");
@@ -204,8 +205,9 @@ async fn main() -> anyhow::Result<()> {
             config.broker.host.clone(),
             config.observability.metrics_port,
             metrics,
-            i32::from(config.broker.id),
-        ).with_flow_controller(flow_controller.clone());
+            config.broker.id,
+        )
+        .with_flow_controller(flow_controller.clone());
         let shutdown_rx = shutdown_rx_http;
         let handle = tokio::spawn(async move {
             if let Err(e) = http_server.run(shutdown_rx).await {
@@ -258,7 +260,9 @@ async fn main() -> anyhow::Result<()> {
             flow_controller_clone,
             tls_acceptor,
             shutdown_rx_tcp,
-        ).await {
+        )
+        .await
+        {
             tracing::error!(error = %e, "Server error");
         }
     });
@@ -270,7 +274,8 @@ async fn main() -> anyhow::Result<()> {
         #[cfg(unix)]
         {
             use tokio::signal::unix::{signal, SignalKind};
-            let mut sighup = signal(SignalKind::hangup()).expect("Failed to register SIGHUP handler");
+            let mut sighup =
+                signal(SignalKind::hangup()).expect("Failed to register SIGHUP handler");
             loop {
                 sighup.recv().await;
                 info!("Received SIGHUP, reloading configuration...");
@@ -306,8 +311,9 @@ async fn main() -> anyhow::Result<()> {
         "R-Kafka broker is ready and accepting connections"
     );
 
-    // 等待 Ctrl-C 关闭信号
-    tokio::signal::ctrl_c().await?;
+    // 等待关闭信号 (SIGINT / SIGTERM)
+    // Kubernetes 发送 SIGTERM，本地 Ctrl-C 发送 SIGINT
+    wait_for_shutdown_signal().await;
     info!("Received shutdown signal, initiating graceful shutdown...");
 
     // 发送关闭信号
@@ -343,6 +349,37 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 等待关闭信号
+///
+/// 监听 SIGINT (Ctrl-C) 和 SIGTERM (Kubernetes)。
+/// 任一信号到达即返回，触发优雅关闭流程。
+async fn wait_for_shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+        let mut sigterm =
+            signal(SignalKind::terminate()).expect("Failed to register SIGTERM handler");
+        let mut sigint =
+            signal(SignalKind::interrupt()).expect("Failed to register SIGINT handler");
+
+        tokio::select! {
+            _ = sigterm.recv() => {
+                tracing::info!("Received SIGTERM");
+            }
+            _ = sigint.recv() => {
+                tracing::info!("Received SIGINT");
+            }
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to listen for Ctrl-C");
+    }
+}
+
 /// 从 BrokerConfig 构建 TLS Acceptor
 fn build_tls_acceptor(config: &rk_core::BrokerConfig) -> anyhow::Result<tokio_rustls::TlsAcceptor> {
     let tls_config = rk_security::tls::TlsConfig {
@@ -351,13 +388,23 @@ fn build_tls_acceptor(config: &rk_core::BrokerConfig) -> anyhow::Result<tokio_ru
             "mutual" | "mTLS" | "mtls" => rk_security::tls::TlsMode::Mutual,
             _ => rk_security::tls::TlsMode::OneWay,
         },
-        cert_path: config.security.cert_path.as_ref()
+        cert_path: config
+            .security
+            .cert_path
+            .as_ref()
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| std::path::PathBuf::from("certs/server.crt")),
-        key_path: config.security.key_path.as_ref()
+        key_path: config
+            .security
+            .key_path
+            .as_ref()
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| std::path::PathBuf::from("certs/server.key")),
-        ca_path: config.security.ca_path.as_ref().map(std::path::PathBuf::from),
+        ca_path: config
+            .security
+            .ca_path
+            .as_ref()
+            .map(std::path::PathBuf::from),
         protocol_versions: vec![rk_security::tls::TlsProtocolVersion::Tls13],
     };
     tls_config.validate()?;

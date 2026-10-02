@@ -293,7 +293,7 @@ impl AclEngine {
             resource_type: entry.resource_type.clone(),
             resource_name,
         };
-        self.rules.entry(key).or_insert_with(Vec::new).push(entry);
+        self.rules.entry(key).or_default().push(entry);
         debug!("ACL rule added");
     }
 
@@ -311,9 +311,7 @@ impl AclEngine {
         };
         if let Some(mut entries) = self.rules.get_mut(&key) {
             let before = entries.len();
-            entries.retain(|e| {
-                !(e.principal == principal && e.operation == *operation)
-            });
+            entries.retain(|e| !(e.principal == principal && e.operation == *operation));
             let removed = entries.len() < before;
             if entries.is_empty() {
                 drop(entries);
@@ -358,12 +356,10 @@ impl AclEngine {
             }
 
             // 检查资源名称匹配
-            let name_matches = entries.iter().any(|e| {
-                match &e.resource_pattern {
-                    ResourcePattern::Literal(s) => s == resource_name,
-                    ResourcePattern::Prefixed(prefix) => resource_name.starts_with(prefix),
-                    ResourcePattern::Any => true,
-                }
+            let name_matches = entries.iter().any(|e| match &e.resource_pattern {
+                ResourcePattern::Literal(s) => s == resource_name,
+                ResourcePattern::Prefixed(prefix) => resource_name.starts_with(prefix),
+                ResourcePattern::Any => true,
             });
 
             if !name_matches {

@@ -7,8 +7,8 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use rk_broker::PartitionManager;
 use rk_broker::BrokerRouter;
+use rk_broker::PartitionManager;
 use rk_protocol::types::KafkaWriter;
 use rk_storage::log_io::build_batch_bytes;
 
@@ -61,7 +61,12 @@ fn build_metadata_request(correlation_id: i32, topics: Option<&[&str]>) -> Vec<u
 }
 
 /// 构建 Produce 请求帧 (api_key=0, version=0)
-fn build_produce_request(correlation_id: i32, topic: &str, partition: i32, batch: &[u8]) -> Vec<u8> {
+fn build_produce_request(
+    correlation_id: i32,
+    topic: &str,
+    partition: i32,
+    batch: &[u8],
+) -> Vec<u8> {
     build_frame(|w| {
         // RequestHeader v0
         w.write_i16(0); // api_key = Produce
@@ -135,12 +140,27 @@ fn build_list_offsets_request(
 
 fn make_test_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
     let records = vec![0u8; record_count as usize * 10];
-    build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+    build_batch_bytes(
+        base_offset,
+        1,
+        0,
+        1000,
+        2000,
+        -1,
+        -1,
+        -1,
+        &records,
+        record_count,
+    )
 }
 
 async fn setup_server() -> (u16, Arc<BrokerRouter>) {
     let dir = tempfile::tempdir().unwrap();
-    let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+    let pm = Arc::new(PartitionManager::new(
+        dir.path().to_path_buf(),
+        1_073_741_824,
+        1,
+    ));
 
     let router = Arc::new(BrokerRouter::new(
         pm,
@@ -180,7 +200,9 @@ async fn setup_server() -> (u16, Arc<BrokerRouter>) {
 async fn test_e2e_metadata_request() {
     let (port, _router) = setup_server().await;
 
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // 发送 Metadata 请求 (所有 topics)
     let frame = build_metadata_request(1, None);
@@ -213,7 +235,9 @@ async fn test_e2e_metadata_request() {
 async fn test_e2e_produce_fetch_listoffsets() {
     let (port, _router) = setup_server().await;
 
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // 1. Produce 写入数据
     let batch = make_test_batch(0, 5);
@@ -241,7 +265,7 @@ async fn test_e2e_produce_fetch_listoffsets() {
     assert_eq!(error_code, 0); // No error
     let base_offset = reader.read_i64().unwrap();
     assert_eq!(base_offset, 0); // First write starts at offset 0
-    // v0 没有 log_append_time_ms (v1+ 才有)
+                                // v0 没有 log_append_time_ms (v1+ 才有)
 
     // 2. Fetch 读取数据
     let frame = build_fetch_request(11, "e2e-topic", 0, 0);
@@ -269,7 +293,7 @@ async fn test_e2e_produce_fetch_listoffsets() {
     assert_eq!(error_code, 0);
     let high_watermark = reader.read_i64().unwrap();
     assert_eq!(high_watermark, 5); // 5 records written
-    // record_set: bytes (nullable)
+                                   // record_set: bytes (nullable)
     let record_set_len = reader.read_i32().unwrap();
     assert!(record_set_len > 0); // Should have data
 
@@ -305,7 +329,9 @@ async fn test_e2e_produce_fetch_listoffsets() {
 async fn test_e2e_multiple_requests_same_connection() {
     let (port, _router) = setup_server().await;
 
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // 在同一连接上发送多个请求
     for i in 0..5 {
@@ -323,7 +349,9 @@ async fn test_e2e_multiple_requests_same_connection() {
 async fn test_e2e_auto_topic_creation() {
     let (port, _router) = setup_server().await;
 
-    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port)).await.unwrap();
+    let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .unwrap();
 
     // 直接 Fetch 一个不存在的 topic (应自动创建)
     let frame = build_fetch_request(20, "auto-created-topic", 0, 0);

@@ -24,7 +24,10 @@ impl DescribeProducersHandler {
         partition_manager: Arc<PartitionManager>,
         producer_state_manager: Arc<ProducerStateManager>,
     ) -> Self {
-        Self { partition_manager, producer_state_manager }
+        Self {
+            partition_manager,
+            producer_state_manager,
+        }
     }
 
     /// 处理 DescribeProducers 请求
@@ -41,7 +44,8 @@ impl DescribeProducersHandler {
             let mut response_partitions = Vec::with_capacity(topic_req.partitions.len());
 
             for &partition_idx in &topic_req.partitions {
-                let exists = self.partition_manager
+                let exists = self
+                    .partition_manager
                     .get_partition_count(&topic_req.name)
                     .map(|count| partition_idx >= 0 && partition_idx < count)
                     .unwrap_or(false);
@@ -57,18 +61,26 @@ impl DescribeProducersHandler {
                 }
 
                 // Phase 1: 从 ProducerStateManager 查询该 partition 的活跃生产者
-                let producers = self.producer_state_manager
+                let producers = self
+                    .producer_state_manager
                     .get_producers_for_partition(&topic_req.name, partition_idx);
 
-                let active_producers = producers.into_iter().map(|state| {
-                    DescribeProducersResponseProducer {
-                        producer_id: state.producer_id,
-                        producer_epoch: state.producer_epoch as i32,
-                        last_sequence: state.last_sequence.get(&(topic_req.name.clone(), partition_idx)).copied().unwrap_or(-1),
-                        last_timestamp: 0, // Phase 1: 不跟踪时间戳
-                        current_txn_start_offset: state.txn_start_offset.unwrap_or(-1),
-                    }
-                }).collect();
+                let active_producers = producers
+                    .into_iter()
+                    .map(|state| {
+                        DescribeProducersResponseProducer {
+                            producer_id: state.producer_id,
+                            producer_epoch: state.producer_epoch as i32,
+                            last_sequence: state
+                                .last_sequence
+                                .get(&(topic_req.name.clone(), partition_idx))
+                                .copied()
+                                .unwrap_or(-1),
+                            last_timestamp: 0, // Phase 1: 不跟踪时间戳
+                            current_txn_start_offset: state.txn_start_offset.unwrap_or(-1),
+                        }
+                    })
+                    .collect();
 
                 response_partitions.push(DescribeProducersResponsePartition {
                     index: partition_idx,
@@ -98,7 +110,11 @@ mod tests {
 
     fn make_handler() -> DescribeProducersHandler {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test", 3);
         let psm = Arc::new(ProducerStateManager::new());
         DescribeProducersHandler::new(pm, psm)
@@ -115,7 +131,10 @@ mod tests {
         };
         let resp = handler.handle(req, 0).unwrap();
         assert_eq!(resp.topics[0].partitions.len(), 2);
-        assert_eq!(resp.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            resp.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         assert!(resp.topics[0].partitions[0].active_producers.is_empty());
     }
 
@@ -129,6 +148,9 @@ mod tests {
             }],
         };
         let resp = handler.handle(req, 0).unwrap();
-        assert_eq!(resp.topics[0].partitions[0].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            resp.topics[0].partitions[0].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 }

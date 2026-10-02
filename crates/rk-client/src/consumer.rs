@@ -130,7 +130,9 @@ impl KafkaConsumer {
     /// 订阅 Topic 列表
     pub fn subscribe(&mut self, topics: &[&str]) -> ClientResult<()> {
         if topics.is_empty() {
-            return Err(ClientError::Config("Must subscribe to at least one topic".to_string()));
+            return Err(ClientError::Config(
+                "Must subscribe to at least one topic".to_string(),
+            ));
         }
         self.subscriptions = topics.iter().map(|t| t.to_string()).collect();
         info!(topics = ?self.subscriptions, group = %self.config.group_id, "Subscribed to topics");
@@ -148,7 +150,9 @@ impl KafkaConsumer {
     /// 从订阅的 Topic 拉取消息，最多返回 `max_poll_records` 条。
     pub async fn poll(&mut self, _timeout: Duration) -> ClientResult<Vec<ConsumerRecord>> {
         if self.subscriptions.is_empty() {
-            return Err(ClientError::Config("Not subscribed to any topic".to_string()));
+            return Err(ClientError::Config(
+                "Not subscribed to any topic".to_string(),
+            ));
         }
 
         // Phase 3: 模拟返回消息 (实际需要通过 Fetch API 拉取)
@@ -178,7 +182,8 @@ impl KafkaConsumer {
             self.offset_store.set_position(tp, offset + 1);
         }
 
-        self.records_consumed.fetch_add(records.len() as i64, Ordering::Relaxed);
+        self.records_consumed
+            .fetch_add(records.len() as i64, Ordering::Relaxed);
         debug!(records = records.len(), "Polled records");
         Ok(records)
     }
@@ -198,10 +203,20 @@ impl KafkaConsumer {
     }
 
     /// 手动提交指定偏移量
-    pub async fn commit_offset(&mut self, topic: &str, partition: i32, offset: i64) -> ClientResult<()> {
+    pub async fn commit_offset(
+        &mut self,
+        topic: &str,
+        partition: i32,
+        offset: i64,
+    ) -> ClientResult<()> {
         let tp = TopicPartition::new(topic, partition);
         self.offset_store.commit(&tp, offset);
-        debug!(topic = topic, partition = partition, offset = offset, "Offset committed");
+        debug!(
+            topic = topic,
+            partition = partition,
+            offset = offset,
+            "Offset committed"
+        );
         Ok(())
     }
 

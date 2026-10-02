@@ -85,7 +85,11 @@ mod tests {
 
     fn make_handler() -> (DeleteRecordsHandler, Arc<PartitionManager>) {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test", 2);
         (DeleteRecordsHandler::new(pm.clone()), pm)
     }
@@ -108,7 +112,10 @@ mod tests {
             timeout_ms: 30000,
         };
         let resp = handler.handle(req, 0).unwrap();
-        assert_eq!(resp.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            resp.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         assert_eq!(resp.topics[0].partitions[0].low_watermark, 3);
     }
 
@@ -126,6 +133,9 @@ mod tests {
             timeout_ms: 30000,
         };
         let resp = handler.handle(req, 0).unwrap();
-        assert_eq!(resp.topics[0].partitions[0].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            resp.topics[0].partitions[0].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 }

@@ -12,9 +12,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use rk_core::types::{Offset, PartitionId, TopicName};
-use rk_protocol::record::{HEADER_SIZE, decode_batch_header};
+use rk_protocol::record::{decode_batch_header, HEADER_SIZE};
 use rk_protocol::types::KafkaReader;
 
 use crate::index::DEFAULT_MAX_INDEX_SIZE;
@@ -267,8 +267,14 @@ impl CommitLog {
     /// 查找包含指定 offset 的 Segment 索引
     fn find_segment_for_offset(&self, target_offset: u64) -> usize {
         // 二分查找: 找到 base_offset ≤ target 的最大 segment
-        let idx = self.segments.partition_point(|s| s.base_offset() <= target_offset);
-        if idx == 0 { 0 } else { idx - 1 }
+        let idx = self
+            .segments
+            .partition_point(|s| s.base_offset() <= target_offset);
+        if idx == 0 {
+            0
+        } else {
+            idx - 1
+        }
     }
 
     /// 获取 Log End Offset
@@ -438,7 +444,18 @@ mod tests {
 
     fn make_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10];
-        build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+        build_batch_bytes(
+            base_offset,
+            1,
+            0,
+            1000,
+            2000,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
+        )
     }
 
     #[test]
@@ -449,7 +466,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             DEFAULT_SEGMENT_MAX_SIZE,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(cl.log_end_offset(), Offset(0));
         assert_eq!(cl.segment_count(), 1);
@@ -463,7 +481,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             DEFAULT_SEGMENT_MAX_SIZE,
-        ).unwrap();
+        )
+        .unwrap();
 
         let batch = make_batch(0, 5);
         let offset = cl.append_batch(&batch).unwrap();
@@ -479,7 +498,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             DEFAULT_SEGMENT_MAX_SIZE,
-        ).unwrap();
+        )
+        .unwrap();
 
         let batch1 = make_batch(0, 5);
         let batch2 = make_batch(5, 3);
@@ -500,7 +520,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             DEFAULT_SEGMENT_MAX_SIZE,
-        ).unwrap();
+        )
+        .unwrap();
 
         let batch1 = make_batch(0, 5);
         let batch2 = make_batch(5, 3);
@@ -536,7 +557,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             DEFAULT_SEGMENT_MAX_SIZE,
-        ).unwrap();
+        )
+        .unwrap();
 
         cl.append_batch(&make_batch(0, 5)).unwrap();
         cl.append_batch(&make_batch(5, 3)).unwrap();
@@ -562,7 +584,8 @@ mod tests {
                 TopicName("test".into()),
                 PartitionId(0),
                 DEFAULT_SEGMENT_MAX_SIZE,
-            ).unwrap();
+            )
+            .unwrap();
 
             cl.append_batch(&make_batch(0, 5)).unwrap();
             cl.append_batch(&make_batch(5, 3)).unwrap();
@@ -575,7 +598,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             DEFAULT_SEGMENT_MAX_SIZE,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(cl.log_end_offset(), Offset(8)); // 5 + 2 + 1 = 8
         assert!(cl.segment_count() >= 1);
@@ -589,7 +613,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             200, // 非常小的 segment 大小，强制滚动
-        ).unwrap();
+        )
+        .unwrap();
 
         // 写入多个 batch，每个约 200+ bytes
         for i in 0..5 {
@@ -598,7 +623,11 @@ mod tests {
         }
 
         // 应该已经滚动到多个 segment
-        assert!(cl.segment_count() > 1, "Expected multiple segments, got {}", cl.segment_count());
+        assert!(
+            cl.segment_count() > 1,
+            "Expected multiple segments, got {}",
+            cl.segment_count()
+        );
     }
 
     #[test]
@@ -609,7 +638,8 @@ mod tests {
             TopicName("test".into()),
             PartitionId(0),
             DEFAULT_SEGMENT_MAX_SIZE,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(cl.high_watermark(), Offset(0));
 

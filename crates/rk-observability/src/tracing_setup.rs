@@ -19,9 +19,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use tracing::Level;
-use tracing_subscriber::{
-    EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Registry,
-};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
 /// 全局初始化标志 (防止重复初始化)
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
@@ -39,7 +37,7 @@ pub enum TracingLayer {
 
 impl TracingLayer {
     /// 从配置字符串解析
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.trim().to_lowercase().as_str() {
             "json" => TracingLayer::Json,
             "otlp" | "opentelemetry" | "otel" => TracingLayer::OpenTelemetry,
@@ -255,19 +253,12 @@ pub fn request_span(api_key: i16, correlation_id: i32) -> tracing::Span {
 
 /// 创建分区操作 span
 pub fn partition_span(topic: &str, partition: i32) -> tracing::Span {
-    tracing::info_span!(
-        "partition_op",
-        topic = topic,
-        partition = partition,
-    )
+    tracing::info_span!("partition_op", topic = topic, partition = partition,)
 }
 
 /// 创建存储操作 span
 pub fn storage_span(operation: &str) -> tracing::Span {
-    tracing::debug_span!(
-        "storage_op",
-        operation = operation,
-    )
+    tracing::debug_span!("storage_op", operation = operation,)
 }
 
 /// 创建复制 span
@@ -287,15 +278,15 @@ mod tests {
 
     #[test]
     fn test_tracing_layer_from_str() {
-        assert_eq!(TracingLayer::from_str("fmt"), TracingLayer::Fmt);
-        assert_eq!(TracingLayer::from_str("json"), TracingLayer::Json);
-        assert_eq!(TracingLayer::from_str("otlp"), TracingLayer::OpenTelemetry);
+        assert_eq!(TracingLayer::parse("fmt"), TracingLayer::Fmt);
+        assert_eq!(TracingLayer::parse("json"), TracingLayer::Json);
+        assert_eq!(TracingLayer::parse("otlp"), TracingLayer::OpenTelemetry);
         assert_eq!(
-            TracingLayer::from_str("opentelemetry"),
+            TracingLayer::parse("opentelemetry"),
             TracingLayer::OpenTelemetry
         );
-        assert_eq!(TracingLayer::from_str("otel"), TracingLayer::OpenTelemetry);
-        assert_eq!(TracingLayer::from_str("unknown"), TracingLayer::Fmt);
+        assert_eq!(TracingLayer::parse("otel"), TracingLayer::OpenTelemetry);
+        assert_eq!(TracingLayer::parse("unknown"), TracingLayer::Fmt);
     }
 
     #[test]

@@ -22,11 +22,7 @@ impl JoinGroupHandler {
     }
 
     /// 处理 JoinGroup 请求
-    pub fn handle(
-        &self,
-        request: JoinGroupRequest,
-        _version: i16,
-    ) -> Result<JoinGroupResponse> {
+    pub fn handle(&self, request: JoinGroupRequest, _version: i16) -> Result<JoinGroupResponse> {
         debug!(
             group_id = %request.group_id,
             member_id = %request.member_id,
@@ -37,7 +33,11 @@ impl JoinGroupHandler {
 
         // 选择第一个协议
         let protocol_name = request.protocols.first().map(|p| p.name.clone());
-        let metadata = request.protocols.first().map(|p| p.metadata.clone()).unwrap_or_default();
+        let metadata = request
+            .protocols
+            .first()
+            .map(|p| p.metadata.clone())
+            .unwrap_or_default();
 
         match self.group_manager.join_group(
             &request.group_id,

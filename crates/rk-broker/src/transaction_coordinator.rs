@@ -40,7 +40,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use tracing::{debug, info, warn};
 
 use crate::producer_state_manager::ProducerStateManager;
@@ -154,7 +154,7 @@ pub struct TxnLogEntry {
 }
 
 /// 事务日志 (内存模拟 __transaction_state)
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TransactionLog {
     entries: Vec<TxnLogEntry>,
     next_offset: AtomicI64,
@@ -162,10 +162,7 @@ pub struct TransactionLog {
 
 impl TransactionLog {
     pub fn new() -> Self {
-        Self {
-            entries: Vec::new(),
-            next_offset: AtomicI64::new(0),
-        }
+        Self::default()
     }
 
     /// 追加日志条目
@@ -190,14 +187,30 @@ impl TransactionLog {
         self.entries
             .iter()
             .filter(|e| match &e.entry_type {
-                TxnLogEntryType::TxnRegister { transactional_id: id, .. }
-                | TxnLogEntryType::TxnStart { transactional_id: id, .. }
-                | TxnLogEntryType::TxnAddPartitions { transactional_id: id, .. }
-                | TxnLogEntryType::TxnCommit { transactional_id: id, .. }
-                | TxnLogEntryType::TxnAbort { transactional_id: id, .. }
-                | TxnLogEntryType::TxnEpochBump { transactional_id: id, .. } => {
-                    id == transactional_id
+                TxnLogEntryType::TxnRegister {
+                    transactional_id: id,
+                    ..
                 }
+                | TxnLogEntryType::TxnStart {
+                    transactional_id: id,
+                    ..
+                }
+                | TxnLogEntryType::TxnAddPartitions {
+                    transactional_id: id,
+                    ..
+                }
+                | TxnLogEntryType::TxnCommit {
+                    transactional_id: id,
+                    ..
+                }
+                | TxnLogEntryType::TxnAbort {
+                    transactional_id: id,
+                    ..
+                }
+                | TxnLogEntryType::TxnEpochBump {
+                    transactional_id: id,
+                    ..
+                } => id == transactional_id,
             })
             .collect()
     }
@@ -296,7 +309,9 @@ impl TransactionCoordinator {
                     transactional_id = transactional_id,
                     "Aborting ongoing transaction during re-init"
                 );
-                let _ = self.producer_state_manager.abort_transaction(existing.producer_id);
+                let _ = self
+                    .producer_state_manager
+                    .abort_transaction(existing.producer_id);
             }
 
             existing.producer_epoch = new_epoch;
@@ -345,8 +360,10 @@ impl TransactionCoordinator {
             last_update_time_ms: current_time_ms(),
         };
 
-        self.transactions.insert(transactional_id.to_string(), metadata);
-        self.producer_to_txn.insert(producer_id, transactional_id.to_string());
+        self.transactions
+            .insert(transactional_id.to_string(), metadata);
+        self.producer_to_txn
+            .insert(producer_id, transactional_id.to_string());
 
         // 注册到 ProducerStateManager
         self.producer_state_manager.register_producer(
@@ -389,10 +406,9 @@ impl TransactionCoordinator {
         partitions: &[i32],
     ) -> Result<()> {
         // 验证 transactional_id 存在
-        let mut entry = self.transactions.get_mut(transactional_id)
-            .ok_or_else(|| RkError::Protocol(
-                format!("Unknown transactional_id: {}", transactional_id)
-            ))?;
+        let mut entry = self.transactions.get_mut(transactional_id).ok_or_else(|| {
+            RkError::Protocol(format!("Unknown transactional_id: {}", transactional_id))
+        })?;
 
         // 验证 producer_id 和 epoch
         self.validate_producer_credentials(&entry, producer_id, producer_epoch)?;
@@ -460,10 +476,9 @@ impl TransactionCoordinator {
         producer_id: i64,
         producer_epoch: i16,
     ) -> Result<()> {
-        let mut entry = self.transactions.get_mut(transactional_id)
-            .ok_or_else(|| RkError::Protocol(
-                format!("Unknown transactional_id: {}", transactional_id)
-            ))?;
+        let mut entry = self.transactions.get_mut(transactional_id).ok_or_else(|| {
+            RkError::Protocol(format!("Unknown transactional_id: {}", transactional_id))
+        })?;
 
         self.validate_producer_credentials(&entry, producer_id, producer_epoch)?;
 
@@ -488,7 +503,8 @@ impl TransactionCoordinator {
         }
 
         // 提交 ProducerStateManager 中的事务
-        self.producer_state_manager.commit_transaction(producer_id)?;
+        self.producer_state_manager
+            .commit_transaction(producer_id)?;
 
         // 完成
         entry.state = TxnCoordinatorState::CompleteCommit;
@@ -511,10 +527,9 @@ impl TransactionCoordinator {
         producer_id: i64,
         producer_epoch: i16,
     ) -> Result<()> {
-        let mut entry = self.transactions.get_mut(transactional_id)
-            .ok_or_else(|| RkError::Protocol(
-                format!("Unknown transactional_id: {}", transactional_id)
-            ))?;
+        let mut entry = self.transactions.get_mut(transactional_id).ok_or_else(|| {
+            RkError::Protocol(format!("Unknown transactional_id: {}", transactional_id))
+        })?;
 
         self.validate_producer_credentials(&entry, producer_id, producer_epoch)?;
 
@@ -566,7 +581,9 @@ impl TransactionCoordinator {
 
     /// 获取事务状态
     pub fn get_state(&self, transactional_id: &str) -> Option<TxnCoordinatorState> {
-        self.transactions.get(transactional_id).map(|e| e.state.clone())
+        self.transactions
+            .get(transactional_id)
+            .map(|e| e.state.clone())
     }
 
     /// 列出所有活跃事务
@@ -600,7 +617,9 @@ impl TransactionCoordinator {
 
     /// 获取事务涉及的分区
     pub fn get_txn_partitions(&self, transactional_id: &str) -> Option<Vec<(String, i32)>> {
-        self.transactions.get(transactional_id).map(|e| e.partitions.clone())
+        self.transactions
+            .get(transactional_id)
+            .map(|e| e.partitions.clone())
     }
 
     /// 事务总数
@@ -624,7 +643,9 @@ impl TransactionCoordinator {
                         "Transaction timed out, aborting"
                     );
                     // 自动中止超时事务
-                    let _ = self.producer_state_manager.abort_transaction(entry.producer_id);
+                    let _ = self
+                        .producer_state_manager
+                        .abort_transaction(entry.producer_id);
                     entry.state = TxnCoordinatorState::CompleteCommit;
                     entry.partitions.clear();
                     expired.push(entry.transactional_id.clone());
@@ -751,17 +772,27 @@ mod tests {
         let (pid, epoch) = coord.init_producer_id("txn-1", None).unwrap();
 
         // 添加分区 → 自动开始事务
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0, 1]).unwrap();
-        assert_eq!(coord.get_state("txn-1").unwrap(), TxnCoordinatorState::Ongoing);
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0, 1])
+            .unwrap();
+        assert_eq!(
+            coord.get_state("txn-1").unwrap(),
+            TxnCoordinatorState::Ongoing
+        );
 
         // 添加更多分区
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-b", &[0]).unwrap();
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-b", &[0])
+            .unwrap();
         let parts = coord.get_txn_partitions("txn-1").unwrap();
         assert_eq!(parts.len(), 3); // topic-a:0, topic-a:1, topic-b:0
 
         // 提交
         coord.commit_transaction("txn-1", pid, epoch).unwrap();
-        assert_eq!(coord.get_state("txn-1").unwrap(), TxnCoordinatorState::CompleteCommit);
+        assert_eq!(
+            coord.get_state("txn-1").unwrap(),
+            TxnCoordinatorState::CompleteCommit
+        );
 
         // 提交后分区被清除
         let parts = coord.get_txn_partitions("txn-1").unwrap();
@@ -773,12 +804,20 @@ mod tests {
         let coord = make_coordinator();
         let (pid, epoch) = coord.init_producer_id("txn-1", None).unwrap();
 
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0]).unwrap();
-        assert_eq!(coord.get_state("txn-1").unwrap(), TxnCoordinatorState::Ongoing);
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0])
+            .unwrap();
+        assert_eq!(
+            coord.get_state("txn-1").unwrap(),
+            TxnCoordinatorState::Ongoing
+        );
 
         // 中止
         coord.abort_transaction("txn-1", pid, epoch).unwrap();
-        assert_eq!(coord.get_state("txn-1").unwrap(), TxnCoordinatorState::CompleteCommit);
+        assert_eq!(
+            coord.get_state("txn-1").unwrap(),
+            TxnCoordinatorState::CompleteCommit
+        );
     }
 
     #[test]
@@ -787,14 +826,24 @@ mod tests {
         let (pid, epoch) = coord.init_producer_id("txn-1", None).unwrap();
 
         // 第一个事务
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0]).unwrap();
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0])
+            .unwrap();
         coord.commit_transaction("txn-1", pid, epoch).unwrap();
 
         // 第二个事务 (同一个 producer)
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-b", &[0]).unwrap();
-        assert_eq!(coord.get_state("txn-1").unwrap(), TxnCoordinatorState::Ongoing);
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-b", &[0])
+            .unwrap();
+        assert_eq!(
+            coord.get_state("txn-1").unwrap(),
+            TxnCoordinatorState::Ongoing
+        );
         coord.commit_transaction("txn-1", pid, epoch).unwrap();
-        assert_eq!(coord.get_state("txn-1").unwrap(), TxnCoordinatorState::CompleteCommit);
+        assert_eq!(
+            coord.get_state("txn-1").unwrap(),
+            TxnCoordinatorState::CompleteCommit
+        );
     }
 
     // ─── 错误场景测试 ───
@@ -839,7 +888,9 @@ mod tests {
         let coord = make_coordinator();
         let (pid, epoch) = coord.init_producer_id("txn-1", None).unwrap();
 
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0]).unwrap();
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0])
+            .unwrap();
         coord.commit_transaction("txn-1", pid, epoch).unwrap();
 
         // 再次提交 → 失败 (CompleteCommit 状态)
@@ -854,7 +905,9 @@ mod tests {
         let coord = make_coordinator();
         let (pid, epoch) = coord.init_producer_id("txn-1", None).unwrap();
 
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0, 1]).unwrap();
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0, 1])
+            .unwrap();
         coord.commit_transaction("txn-1", pid, epoch).unwrap();
 
         // 日志应包含: Register + Start + AddPartitions(0) + AddPartitions(1) + Commit = 5
@@ -867,7 +920,9 @@ mod tests {
         let coord = make_coordinator();
         let (pid, epoch) = coord.init_producer_id("txn-1", None).unwrap();
 
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0]).unwrap();
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0])
+            .unwrap();
         coord.abort_transaction("txn-1", pid, epoch).unwrap();
 
         // Register + Start + AddPartitions + Abort = 4
@@ -893,18 +948,34 @@ mod tests {
         let (pid2, epoch2) = coord.init_producer_id("txn-2", None).unwrap();
 
         // 两个事务同时进行
-        coord.add_partitions_to_txn("txn-1", pid1, epoch1, "topic-a", &[0]).unwrap();
-        coord.add_partitions_to_txn("txn-2", pid2, epoch2, "topic-b", &[0]).unwrap();
+        coord
+            .add_partitions_to_txn("txn-1", pid1, epoch1, "topic-a", &[0])
+            .unwrap();
+        coord
+            .add_partitions_to_txn("txn-2", pid2, epoch2, "topic-b", &[0])
+            .unwrap();
 
-        assert_eq!(coord.get_state("txn-1").unwrap(), TxnCoordinatorState::Ongoing);
-        assert_eq!(coord.get_state("txn-2").unwrap(), TxnCoordinatorState::Ongoing);
+        assert_eq!(
+            coord.get_state("txn-1").unwrap(),
+            TxnCoordinatorState::Ongoing
+        );
+        assert_eq!(
+            coord.get_state("txn-2").unwrap(),
+            TxnCoordinatorState::Ongoing
+        );
 
         // 提交 txn-1, 中止 txn-2
         coord.commit_transaction("txn-1", pid1, epoch1).unwrap();
         coord.abort_transaction("txn-2", pid2, epoch2).unwrap();
 
-        assert_eq!(coord.get_state("txn-1").unwrap(), TxnCoordinatorState::CompleteCommit);
-        assert_eq!(coord.get_state("txn-2").unwrap(), TxnCoordinatorState::CompleteCommit);
+        assert_eq!(
+            coord.get_state("txn-1").unwrap(),
+            TxnCoordinatorState::CompleteCommit
+        );
+        assert_eq!(
+            coord.get_state("txn-2").unwrap(),
+            TxnCoordinatorState::CompleteCommit
+        );
     }
 
     // ─── 查询接口测试 ───
@@ -915,7 +986,9 @@ mod tests {
         let (pid1, epoch1) = coord.init_producer_id("txn-1", None).unwrap();
         let (_pid2, _epoch2) = coord.init_producer_id("txn-2", None).unwrap();
 
-        coord.add_partitions_to_txn("txn-1", pid1, epoch1, "topic-a", &[0]).unwrap();
+        coord
+            .add_partitions_to_txn("txn-1", pid1, epoch1, "topic-a", &[0])
+            .unwrap();
 
         let all = coord.list_transactions();
         assert_eq!(all.len(), 2);
@@ -931,14 +1004,22 @@ mod tests {
         let (pid, epoch) = coord.init_producer_id("txn-1", None).unwrap();
 
         // 开始事务
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0]).unwrap();
-        assert_eq!(coord.get_state("txn-1").unwrap(), TxnCoordinatorState::Ongoing);
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0])
+            .unwrap();
+        assert_eq!(
+            coord.get_state("txn-1").unwrap(),
+            TxnCoordinatorState::Ongoing
+        );
 
         // 重新初始化 → 应自动中止进行中的事务
         let (pid2, epoch2) = coord.init_producer_id("txn-1", None).unwrap();
         assert_eq!(pid2, pid);
         assert_eq!(epoch2, epoch + 1);
-        assert_eq!(coord.get_state("txn-1").unwrap(), TxnCoordinatorState::Ready);
+        assert_eq!(
+            coord.get_state("txn-1").unwrap(),
+            TxnCoordinatorState::Ready
+        );
     }
 
     // ─── TransactionLog 单元测试 ───
@@ -1007,9 +1088,13 @@ mod tests {
         let coord = make_coordinator();
         let (pid, epoch) = coord.init_producer_id("txn-1", None).unwrap();
 
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0, 1]).unwrap();
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0, 1])
+            .unwrap();
         // 再次添加相同的分区
-        coord.add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0, 1]).unwrap();
+        coord
+            .add_partitions_to_txn("txn-1", pid, epoch, "topic-a", &[0, 1])
+            .unwrap();
 
         let parts = coord.get_txn_partitions("txn-1").unwrap();
         assert_eq!(parts.len(), 2); // 不重复

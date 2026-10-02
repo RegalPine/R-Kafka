@@ -27,20 +27,15 @@ use crate::rack_awareness::{RackId, RackTopology};
 // ─── 放置策略 ────────────────────────────────────────────────────────
 
 /// 副本放置策略
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PlacementStrategy {
     /// 跨机架均匀分布 (默认)
+    #[default]
     RackAwareSpread,
     /// 首选 Leader 跨机架均衡
     LeaderBalanced,
     /// 考虑 Broker 当前负载
     LoadAwareed,
-}
-
-impl Default for PlacementStrategy {
-    fn default() -> Self {
-        Self::RackAwareSpread
-    }
 }
 
 // ─── PlacementPlan ───────────────────────────────────────────────────
@@ -87,7 +82,9 @@ impl PlacementPlan {
 
     /// 获取指定 partition 的首选 Leader
     pub fn preferred_leader(&self, partition_id: i32) -> Option<i32> {
-        self.assignments.get(&partition_id).and_then(|r| r.first().copied())
+        self.assignments
+            .get(&partition_id)
+            .and_then(|r| r.first().copied())
     }
 
     /// 获取所有涉及的 Broker ID
@@ -251,7 +248,12 @@ impl ReplicaPlacer {
         topology: &RackTopology,
     ) -> Result<PlacementPlan, PlacementError> {
         // 先做基本的 rack-aware 分配
-        let mut plan = Self::place_rack_aware_spread(topic_name, partition_count, replication_factor, topology)?;
+        let mut plan = Self::place_rack_aware_spread(
+            topic_name,
+            partition_count,
+            replication_factor,
+            topology,
+        )?;
 
         // 然后均衡首选 Leader 分布
         let racks = topology.rack_ids();
@@ -338,7 +340,7 @@ impl ReplicaPlacer {
             fell_back = true;
             // 回退: 按负载排序选择
             let mut sorted: Vec<(i32, u32)> = broker_loads.iter().map(|(&k, &v)| (k, v)).collect();
-            sorted.sort_by(|a, b| a.1.cmp(&b.1));
+            sorted.sort_by_key(|a| a.1);
 
             for pid in 0..partition_count {
                 let mut replicas = Vec::with_capacity(replication_factor);
@@ -460,7 +462,7 @@ impl ReplicaPlacer {
         PlacementStats {
             racks_used: racks_used.len(),
             rack_constraint_satisfied: rack_satisfied,
-            broker_load: broker_load,
+            broker_load,
             load_stddev: stddev,
             leader_distribution: leader_dist,
             fell_back,
@@ -542,8 +544,15 @@ impl std::fmt::Display for PlacementError {
             PlacementError::NoBrokersAvailable => {
                 write!(f, "No brokers available for replica placement")
             }
-            PlacementError::InsufficientBrokers { required, available } => {
-                write!(f, "Need {} brokers but only {} available", required, available)
+            PlacementError::InsufficientBrokers {
+                required,
+                available,
+            } => {
+                write!(
+                    f,
+                    "Need {} brokers but only {} available",
+                    required, available
+                )
             }
             PlacementError::InvalidPartitions(n) => {
                 write!(f, "Invalid partition count: {}", n)
@@ -564,28 +573,46 @@ mod tests {
     fn make_topology_3rack() -> RackTopology {
         let brokers = vec![
             BrokerRackInfo {
-                broker_id: 1, rack_id: RackId::new("rack-a"),
-                host: "192.168.1.1".into(), is_alive: true, partition_load: 0,
+                broker_id: 1,
+                rack_id: RackId::new("rack-a"),
+                host: "192.168.1.1".into(),
+                is_alive: true,
+                partition_load: 0,
             },
             BrokerRackInfo {
-                broker_id: 2, rack_id: RackId::new("rack-a"),
-                host: "192.168.1.2".into(), is_alive: true, partition_load: 0,
+                broker_id: 2,
+                rack_id: RackId::new("rack-a"),
+                host: "192.168.1.2".into(),
+                is_alive: true,
+                partition_load: 0,
             },
             BrokerRackInfo {
-                broker_id: 3, rack_id: RackId::new("rack-b"),
-                host: "192.168.1.3".into(), is_alive: true, partition_load: 0,
+                broker_id: 3,
+                rack_id: RackId::new("rack-b"),
+                host: "192.168.1.3".into(),
+                is_alive: true,
+                partition_load: 0,
             },
             BrokerRackInfo {
-                broker_id: 4, rack_id: RackId::new("rack-b"),
-                host: "192.168.1.4".into(), is_alive: true, partition_load: 0,
+                broker_id: 4,
+                rack_id: RackId::new("rack-b"),
+                host: "192.168.1.4".into(),
+                is_alive: true,
+                partition_load: 0,
             },
             BrokerRackInfo {
-                broker_id: 5, rack_id: RackId::new("rack-c"),
-                host: "192.168.1.5".into(), is_alive: true, partition_load: 0,
+                broker_id: 5,
+                rack_id: RackId::new("rack-c"),
+                host: "192.168.1.5".into(),
+                is_alive: true,
+                partition_load: 0,
             },
             BrokerRackInfo {
-                broker_id: 6, rack_id: RackId::new("rack-c"),
-                host: "192.168.1.6".into(), is_alive: true, partition_load: 0,
+                broker_id: 6,
+                rack_id: RackId::new("rack-c"),
+                host: "192.168.1.6".into(),
+                is_alive: true,
+                partition_load: 0,
             },
         ];
         RackTopology::from_brokers(&brokers)
@@ -596,21 +623,29 @@ mod tests {
     #[test]
     fn test_rack_aware_spread_3rack_3replica() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "orders", 6, 3, &topo, PlacementStrategy::RackAwareSpread,
-        ).unwrap();
+        let plan = ReplicaPlacer::place("orders", 6, 3, &topo, PlacementStrategy::RackAwareSpread)
+            .unwrap();
 
         assert_eq!(plan.assignments.len(), 6);
-        assert!(plan.stats.rack_constraint_satisfied, "Rack constraint should be satisfied");
+        assert!(
+            plan.stats.rack_constraint_satisfied,
+            "Rack constraint should be satisfied"
+        );
         assert_eq!(plan.stats.racks_used, 3);
 
         // 每个 partition 的 3 个副本应该在不同机架上
         for (pid, replicas) in &plan.assignments {
-            assert_eq!(replicas.len(), 3, "Partition {} should have 3 replicas", pid);
+            assert_eq!(
+                replicas.len(),
+                3,
+                "Partition {} should have 3 replicas",
+                pid
+            );
             assert!(
                 topo.all_on_different_racks(replicas),
                 "Partition {} replicas {:?} should be on different racks",
-                pid, replicas
+                pid,
+                replicas
             );
         }
     }
@@ -618,9 +653,8 @@ mod tests {
     #[test]
     fn test_rack_aware_spread_rf2() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "events", 12, 2, &topo, PlacementStrategy::RackAwareSpread,
-        ).unwrap();
+        let plan = ReplicaPlacer::place("events", 12, 2, &topo, PlacementStrategy::RackAwareSpread)
+            .unwrap();
 
         assert_eq!(plan.assignments.len(), 12);
         assert!(plan.stats.rack_constraint_satisfied);
@@ -634,9 +668,8 @@ mod tests {
     #[test]
     fn test_rack_aware_spread_rf1() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "simple", 6, 1, &topo, PlacementStrategy::RackAwareSpread,
-        ).unwrap();
+        let plan = ReplicaPlacer::place("simple", 6, 1, &topo, PlacementStrategy::RackAwareSpread)
+            .unwrap();
 
         assert_eq!(plan.assignments.len(), 6);
         for (_, replicas) in &plan.assignments {
@@ -649,29 +682,43 @@ mod tests {
     #[test]
     fn test_leader_balanced() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "balanced", 6, 3, &topo, PlacementStrategy::LeaderBalanced,
-        ).unwrap();
+        let plan = ReplicaPlacer::place("balanced", 6, 3, &topo, PlacementStrategy::LeaderBalanced)
+            .unwrap();
 
         assert_eq!(plan.assignments.len(), 6);
         // Leader 应该分布在多个 broker 上
-        assert!(plan.stats.leader_distribution.len() > 1, "Leaders should be distributed");
+        assert!(
+            plan.stats.leader_distribution.len() > 1,
+            "Leaders should be distributed"
+        );
     }
 
     #[test]
     fn test_leader_balanced_even_distribution() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "even", 6, 1, &topo, PlacementStrategy::LeaderBalanced,
-        ).unwrap();
+        let plan =
+            ReplicaPlacer::place("even", 6, 1, &topo, PlacementStrategy::LeaderBalanced).unwrap();
 
         // RF=1 时，每个 broker 应该有 1 个 leader (6 brokers, 6 partitions)
-        let max_leaders = plan.stats.leader_distribution.values().max().copied().unwrap_or(0);
-        let min_leaders = plan.stats.leader_distribution.values().min().copied().unwrap_or(0);
+        let max_leaders = plan
+            .stats
+            .leader_distribution
+            .values()
+            .max()
+            .copied()
+            .unwrap_or(0);
+        let min_leaders = plan
+            .stats
+            .leader_distribution
+            .values()
+            .min()
+            .copied()
+            .unwrap_or(0);
         assert!(
             max_leaders - min_leaders <= 1,
             "Leader distribution should be nearly even: max={}, min={}",
-            max_leaders, min_leaders
+            max_leaders,
+            min_leaders
         );
     }
 
@@ -680,9 +727,8 @@ mod tests {
     #[test]
     fn test_load_awareed_basic() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "loaded", 6, 3, &topo, PlacementStrategy::LoadAwareed,
-        ).unwrap();
+        let plan =
+            ReplicaPlacer::place("loaded", 6, 3, &topo, PlacementStrategy::LoadAwareed).unwrap();
 
         assert_eq!(plan.assignments.len(), 6);
         assert!(plan.stats.rack_constraint_satisfied);
@@ -693,34 +739,51 @@ mod tests {
         // 设置不同负载
         let brokers = vec![
             BrokerRackInfo {
-                broker_id: 1, rack_id: RackId::new("rack-a"),
-                host: "192.168.1.1".into(), is_alive: true, partition_load: 100,
+                broker_id: 1,
+                rack_id: RackId::new("rack-a"),
+                host: "192.168.1.1".into(),
+                is_alive: true,
+                partition_load: 100,
             },
             BrokerRackInfo {
-                broker_id: 2, rack_id: RackId::new("rack-a"),
-                host: "192.168.1.2".into(), is_alive: true, partition_load: 0,
+                broker_id: 2,
+                rack_id: RackId::new("rack-a"),
+                host: "192.168.1.2".into(),
+                is_alive: true,
+                partition_load: 0,
             },
             BrokerRackInfo {
-                broker_id: 3, rack_id: RackId::new("rack-b"),
-                host: "192.168.1.3".into(), is_alive: true, partition_load: 50,
+                broker_id: 3,
+                rack_id: RackId::new("rack-b"),
+                host: "192.168.1.3".into(),
+                is_alive: true,
+                partition_load: 50,
             },
             BrokerRackInfo {
-                broker_id: 4, rack_id: RackId::new("rack-b"),
-                host: "192.168.1.4".into(), is_alive: true, partition_load: 0,
+                broker_id: 4,
+                rack_id: RackId::new("rack-b"),
+                host: "192.168.1.4".into(),
+                is_alive: true,
+                partition_load: 0,
             },
             BrokerRackInfo {
-                broker_id: 5, rack_id: RackId::new("rack-c"),
-                host: "192.168.1.5".into(), is_alive: true, partition_load: 80,
+                broker_id: 5,
+                rack_id: RackId::new("rack-c"),
+                host: "192.168.1.5".into(),
+                is_alive: true,
+                partition_load: 80,
             },
             BrokerRackInfo {
-                broker_id: 6, rack_id: RackId::new("rack-c"),
-                host: "192.168.1.6".into(), is_alive: true, partition_load: 0,
+                broker_id: 6,
+                rack_id: RackId::new("rack-c"),
+                host: "192.168.1.6".into(),
+                is_alive: true,
+                partition_load: 0,
             },
         ];
         let topo = RackTopology::from_brokers(&brokers);
-        let plan = ReplicaPlacer::place(
-            "test", 3, 3, &topo, PlacementStrategy::LoadAwareed,
-        ).unwrap();
+        let plan =
+            ReplicaPlacer::place("test", 3, 3, &topo, PlacementStrategy::LoadAwareed).unwrap();
 
         // 低负载 broker (2, 4, 6) 应该获得更多 partition
         let low_load_total: u32 = plan.stats.broker_load.get(&2).copied().unwrap_or(0)
@@ -733,7 +796,8 @@ mod tests {
         assert!(
             low_load_total >= high_load_total,
             "Low-load brokers should get more partitions: low={}, high={}",
-            low_load_total, high_load_total
+            low_load_total,
+            high_load_total
         );
     }
 
@@ -748,17 +812,21 @@ mod tests {
 
     #[test]
     fn test_insufficient_brokers() {
-        let brokers = vec![
-            BrokerRackInfo {
-                broker_id: 1, rack_id: RackId::new("rack-a"),
-                host: "192.168.1.1".into(), is_alive: true, partition_load: 0,
-            },
-        ];
+        let brokers = vec![BrokerRackInfo {
+            broker_id: 1,
+            rack_id: RackId::new("rack-a"),
+            host: "192.168.1.1".into(),
+            is_alive: true,
+            partition_load: 0,
+        }];
         let topo = RackTopology::from_brokers(&brokers);
         let result = ReplicaPlacer::place("test", 3, 3, &topo, PlacementStrategy::RackAwareSpread);
         assert_eq!(
             result,
-            Err(PlacementError::InsufficientBrokers { required: 3, available: 1 })
+            Err(PlacementError::InsufficientBrokers {
+                required: 3,
+                available: 1
+            })
         );
     }
 
@@ -774,9 +842,8 @@ mod tests {
     #[test]
     fn test_plan_replicas_for() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "test", 3, 2, &topo, PlacementStrategy::RackAwareSpread,
-        ).unwrap();
+        let plan =
+            ReplicaPlacer::place("test", 3, 2, &topo, PlacementStrategy::RackAwareSpread).unwrap();
 
         let replicas = plan.replicas_for(0).unwrap();
         assert_eq!(replicas.len(), 2);
@@ -786,9 +853,8 @@ mod tests {
     #[test]
     fn test_plan_preferred_leader() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "test", 3, 3, &topo, PlacementStrategy::RackAwareSpread,
-        ).unwrap();
+        let plan =
+            ReplicaPlacer::place("test", 3, 3, &topo, PlacementStrategy::RackAwareSpread).unwrap();
 
         let leader = plan.preferred_leader(0).unwrap();
         assert!(leader > 0);
@@ -798,9 +864,8 @@ mod tests {
     #[test]
     fn test_plan_involved_brokers() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "test", 6, 3, &topo, PlacementStrategy::RackAwareSpread,
-        ).unwrap();
+        let plan =
+            ReplicaPlacer::place("test", 6, 3, &topo, PlacementStrategy::RackAwareSpread).unwrap();
 
         let brokers = plan.involved_brokers();
         assert!(brokers.len() >= 3, "Should involve at least 3 brokers");
@@ -809,9 +874,8 @@ mod tests {
     #[test]
     fn test_plan_involved_racks() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "test", 6, 3, &topo, PlacementStrategy::RackAwareSpread,
-        ).unwrap();
+        let plan =
+            ReplicaPlacer::place("test", 6, 3, &topo, PlacementStrategy::RackAwareSpread).unwrap();
 
         let racks = plan.involved_racks(&topo);
         assert_eq!(racks.len(), 3, "Should involve all 3 racks");
@@ -879,9 +943,8 @@ mod tests {
     #[test]
     fn test_stats_load_stddev_balanced() {
         let topo = make_topology_3rack();
-        let plan = ReplicaPlacer::place(
-            "test", 6, 1, &topo, PlacementStrategy::RackAwareSpread,
-        ).unwrap();
+        let plan =
+            ReplicaPlacer::place("test", 6, 1, &topo, PlacementStrategy::RackAwareSpread).unwrap();
 
         // RF=1, 6 partitions, 6 brokers → 完全均衡
         assert!(
@@ -896,25 +959,36 @@ mod tests {
         // 只有 2 个机架但需要 3 副本
         let brokers = vec![
             BrokerRackInfo {
-                broker_id: 1, rack_id: RackId::new("rack-a"),
-                host: "192.168.1.1".into(), is_alive: true, partition_load: 0,
+                broker_id: 1,
+                rack_id: RackId::new("rack-a"),
+                host: "192.168.1.1".into(),
+                is_alive: true,
+                partition_load: 0,
             },
             BrokerRackInfo {
-                broker_id: 2, rack_id: RackId::new("rack-a"),
-                host: "192.168.1.2".into(), is_alive: true, partition_load: 0,
+                broker_id: 2,
+                rack_id: RackId::new("rack-a"),
+                host: "192.168.1.2".into(),
+                is_alive: true,
+                partition_load: 0,
             },
             BrokerRackInfo {
-                broker_id: 3, rack_id: RackId::new("rack-b"),
-                host: "192.168.1.3".into(), is_alive: true, partition_load: 0,
+                broker_id: 3,
+                rack_id: RackId::new("rack-b"),
+                host: "192.168.1.3".into(),
+                is_alive: true,
+                partition_load: 0,
             },
         ];
         let topo = RackTopology::from_brokers(&brokers);
-        let plan = ReplicaPlacer::place(
-            "test", 3, 3, &topo, PlacementStrategy::RackAwareSpread,
-        ).unwrap();
+        let plan =
+            ReplicaPlacer::place("test", 3, 3, &topo, PlacementStrategy::RackAwareSpread).unwrap();
 
         assert!(plan.stats.fell_back, "Should fall back when racks < RF");
-        assert!(!plan.stats.rack_constraint_satisfied, "Rack constraint should NOT be satisfied");
+        assert!(
+            !plan.stats.rack_constraint_satisfied,
+            "Rack constraint should NOT be satisfied"
+        );
     }
 
     // ─── 序列化测试 ─────────────────────────────────────────────────
@@ -929,7 +1003,10 @@ mod tests {
 
     #[test]
     fn test_placement_error_display() {
-        let err = PlacementError::InsufficientBrokers { required: 3, available: 1 };
+        let err = PlacementError::InsufficientBrokers {
+            required: 3,
+            available: 1,
+        };
         let msg = format!("{}", err);
         assert!(msg.contains("3"));
         assert!(msg.contains("1"));
@@ -942,9 +1019,8 @@ mod tests {
         let topo = make_topology_3rack();
 
         // 1. 创建放置计划
-        let plan = ReplicaPlacer::place(
-            "orders", 12, 3, &topo, PlacementStrategy::RackAwareSpread,
-        ).unwrap();
+        let plan = ReplicaPlacer::place("orders", 12, 3, &topo, PlacementStrategy::RackAwareSpread)
+            .unwrap();
 
         // 2. 验证约束
         assert!(plan.stats.rack_constraint_satisfied);
@@ -952,7 +1028,12 @@ mod tests {
 
         // 3. 验证所有 partition 有正确副本数
         for (pid, replicas) in &plan.assignments {
-            assert_eq!(replicas.len(), 3, "Partition {} should have 3 replicas", pid);
+            assert_eq!(
+                replicas.len(),
+                3,
+                "Partition {} should have 3 replicas",
+                pid
+            );
             let mut unique = replicas.clone();
             unique.sort();
             unique.dedup();
@@ -960,9 +1041,8 @@ mod tests {
         }
 
         // 4. 计算重分配到不同策略
-        let plan2 = ReplicaPlacer::place(
-            "orders", 12, 3, &topo, PlacementStrategy::LeaderBalanced,
-        ).unwrap();
+        let plan2 = ReplicaPlacer::place("orders", 12, 3, &topo, PlacementStrategy::LeaderBalanced)
+            .unwrap();
 
         let reassignment = compute_reassignment("orders", &plan.assignments, &plan2.assignments);
         // 两种策略可能产生不同的分配

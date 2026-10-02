@@ -26,7 +26,11 @@ impl ListOffsetsHandler {
     }
 
     /// 处理 ListOffsets 请求
-    pub fn handle(&self, request: ListOffsetsRequest, _version: i16) -> Result<ListOffsetsResponse> {
+    pub fn handle(
+        &self,
+        request: ListOffsetsRequest,
+        _version: i16,
+    ) -> Result<ListOffsetsResponse> {
         let mut response_topics = Vec::with_capacity(request.topics.len());
 
         for topic_req in &request.topics {
@@ -82,12 +86,7 @@ impl ListOffsetsHandler {
     /// 解析指定 partition 的 offset
     ///
     /// 返回 (timestamp, offset)
-    fn resolve_offset(
-        &self,
-        topic: &str,
-        partition: i32,
-        timestamp: i64,
-    ) -> Result<(i64, i64)> {
+    fn resolve_offset(&self, topic: &str, partition: i32, timestamp: i64) -> Result<(i64, i64)> {
         // 确保 topic/partition 存在
         self.partition_manager.get_or_create_topic(topic, 1);
         let _ = self.partition_manager.ensure_partition(topic, partition);
@@ -104,7 +103,10 @@ impl ListOffsetsHandler {
             }
             ts if ts >= 0 => {
                 // 按时间查找
-                match self.partition_manager.offset_for_timestamp(topic, partition, ts)? {
+                match self
+                    .partition_manager
+                    .offset_for_timestamp(topic, partition, ts)?
+                {
                     Some(offset) => Ok((ts, offset.0)),
                     None => {
                         // 未找到 → 返回 LATEST
@@ -115,9 +117,10 @@ impl ListOffsetsHandler {
             }
             _ => {
                 // 无效 timestamp
-                Err(rk_core::error::RkError::Protocol(
-                    format!("Invalid timestamp: {}", timestamp),
-                ))
+                Err(rk_core::error::RkError::Protocol(format!(
+                    "Invalid timestamp: {}",
+                    timestamp
+                )))
             }
         }
     }
@@ -131,14 +134,27 @@ mod tests {
 
     fn make_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10];
-        build_batch_bytes(base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count)
+        build_batch_bytes(
+            base_offset,
+            1,
+            0,
+            1000,
+            2000,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
+        )
     }
 
     fn make_handler() -> ListOffsetsHandler {
         let dir = tempdir().unwrap();
-        let pm = std::sync::Arc::new(
-            PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1)
-        );
+        let pm = std::sync::Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test-topic", 1);
         pm.append_batch("test-topic", 0, &make_batch(0, 5)).unwrap();
         pm.append_batch("test-topic", 0, &make_batch(5, 3)).unwrap();
@@ -163,7 +179,10 @@ mod tests {
         };
 
         let response = handler.handle(request, 1).unwrap();
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         assert_eq!(response.topics[0].partitions[0].offset, 8); // LEO = 5 + 3 = 8
     }
 
@@ -184,7 +203,10 @@ mod tests {
         };
 
         let response = handler.handle(request, 1).unwrap();
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         assert_eq!(response.topics[0].partitions[0].offset, 0);
     }
 
@@ -205,7 +227,10 @@ mod tests {
         };
 
         let response = handler.handle(request, 1).unwrap();
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
         // 应返回某个 offset (具体取决于时间索引实现)
         assert!(response.topics[0].partitions[0].offset >= 0);
     }
@@ -228,6 +253,9 @@ mod tests {
 
         let response = handler.handle(request, 1).unwrap();
         // 自动创建 topic 后返回 LEO=0
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
     }
 }

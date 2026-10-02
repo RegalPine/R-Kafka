@@ -18,7 +18,12 @@ pub struct DescribeClusterHandler {
 
 impl DescribeClusterHandler {
     pub fn new(broker_id: i32, broker_host: String, broker_port: i32, cluster_id: String) -> Self {
-        Self { broker_id, broker_host, broker_port, cluster_id }
+        Self {
+            broker_id,
+            broker_host,
+            broker_port,
+            cluster_id,
+        }
     }
 
     /// 处理 DescribeCluster 请求

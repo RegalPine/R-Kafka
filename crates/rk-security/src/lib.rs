@@ -26,39 +26,29 @@
 //! └──────────────────────────────────────────────┘
 //! ```
 
-pub mod tls;
-pub mod sasl;
 pub mod acl;
+pub mod api_permissions;
 pub mod audit;
 pub mod auth_pipeline;
-pub mod api_permissions;
+pub mod sasl;
+pub mod tls;
 
 // Re-exports
-pub use tls::{
-    TlsConfig, TlsMode, TlsProtocolVersion, TlsClientConfig,
-    TlsConnectionState, SecureStream, CertificateInfo,
-    create_tls_acceptor, create_tls_connector,
-    load_certs, load_private_key, load_ca_certs,
-    parse_certificate_info,
-};
-pub use sasl::{
-    SaslMechanism, SaslConfig, SaslSession, AuthState,
-    UserCredentials, UserDatabase,
-};
 pub use acl::{
-    ResourceType, ResourcePattern, AclOperation, PermissionType,
-    AclEntry, AclEngine,
-    super_user_acl, topic_read_acl, topic_write_acl,
-    group_read_acl, prefix_acl,
-};
-pub use audit::{
-    AuditEventType, AuditEvent, AuditConfig, AuditLogger,
-};
-pub use auth_pipeline::{
-    SecurityContext, SecurityPipelineConfig, SecurityPipeline,
-    AuthzResult, SecurityPipelineSummary,
+    group_read_acl, prefix_acl, super_user_acl, topic_read_acl, topic_write_acl, AclEngine,
+    AclEntry, AclOperation, PermissionType, ResourcePattern, ResourceType,
 };
 pub use api_permissions::{
-    ApiPermission, api_permission, is_pre_auth_api,
-    api_required_operation, api_required_resource_type,
+    api_permission, api_required_operation, api_required_resource_type, is_pre_auth_api,
+    ApiPermission,
+};
+pub use audit::{AuditConfig, AuditEvent, AuditEventType, AuditLogger};
+pub use auth_pipeline::{
+    AuthzResult, SecurityContext, SecurityPipeline, SecurityPipelineConfig, SecurityPipelineSummary,
+};
+pub use sasl::{AuthState, SaslConfig, SaslMechanism, SaslSession, UserCredentials, UserDatabase};
+pub use tls::{
+    create_tls_acceptor, create_tls_connector, load_ca_certs, load_certs, load_private_key,
+    parse_certificate_info, CertificateInfo, SecureStream, TlsClientConfig, TlsConfig,
+    TlsConnectionState, TlsMode, TlsProtocolVersion,
 };

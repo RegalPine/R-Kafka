@@ -174,7 +174,8 @@ fn test_fuzz_find_coordinator_request() {
         };
 
         for version in [0i16, 1, 4] {
-            let _ = fuzz_decoder::<FindCoordinatorRequest>("FindCoordinatorRequest", version, &data);
+            let _ =
+                fuzz_decoder::<FindCoordinatorRequest>("FindCoordinatorRequest", version, &data);
         }
     }
 }
@@ -191,7 +192,8 @@ fn test_fuzz_describe_configs_request() {
         };
 
         for version in [0i16, 1, 3] {
-            let _ = fuzz_decoder::<DescribeConfigsRequest>("DescribeConfigsRequest", version, &data);
+            let _ =
+                fuzz_decoder::<DescribeConfigsRequest>("DescribeConfigsRequest", version, &data);
         }
     }
 }
@@ -242,8 +244,10 @@ fn test_fuzz_single_byte() {
             let _ = fuzz_decoder::<ListOffsetsRequest>("ListOffsetsRequest", version, &data);
             let _ = fuzz_decoder::<CreateTopicsRequest>("CreateTopicsRequest", version, &data);
             let _ = fuzz_decoder::<DeleteTopicsRequest>("DeleteTopicsRequest", version, &data);
-            let _ = fuzz_decoder::<FindCoordinatorRequest>("FindCoordinatorRequest", version, &data);
-            let _ = fuzz_decoder::<DescribeConfigsRequest>("DescribeConfigsRequest", version, &data);
+            let _ =
+                fuzz_decoder::<FindCoordinatorRequest>("FindCoordinatorRequest", version, &data);
+            let _ =
+                fuzz_decoder::<DescribeConfigsRequest>("DescribeConfigsRequest", version, &data);
             let _ = fuzz_decoder::<AlterConfigsRequest>("AlterConfigsRequest", version, &data);
         }
     }

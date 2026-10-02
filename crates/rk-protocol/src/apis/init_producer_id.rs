@@ -3,10 +3,10 @@
 //! 幂等生产者: 获取 Producer ID 和 Epoch。
 //! Phase 1: 简化实现，直接分配递增 PID。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 

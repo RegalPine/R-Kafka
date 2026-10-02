@@ -169,7 +169,7 @@ impl BrokerRegistry {
             .filter(|r| r.value().is_alive)
             .filter_map(|r| {
                 self.registrations
-                    .get(&r.key())
+                    .get(r.key())
                     .map(|reg| reg.value().clone())
             })
             .collect()
@@ -219,9 +219,7 @@ impl BrokerRegistry {
     /// 移除 Broker 的所有记录 (完全删除)
     pub fn remove(&self, broker_id: i32) -> Option<BrokerRegistration> {
         self.heartbeats.remove(&broker_id);
-        self.registrations
-            .remove(&broker_id)
-            .map(|(_, v)| v)
+        self.registrations.remove(&broker_id).map(|(_, v)| v)
     }
 
     /// 获取心跳超时阈值

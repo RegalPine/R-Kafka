@@ -35,7 +35,7 @@ pub enum ConnectionState {
 /// 传输层流: 支持纯 TCP 和 TLS
 enum TransportStream {
     Tcp(TcpStream),
-    Tls(TlsStream<TcpStream>),
+    Tls(Box<TlsStream<TcpStream>>),
 }
 
 impl AsyncRead for TransportStream {
@@ -99,10 +99,7 @@ impl Connection {
     pub fn new(stream: TcpStream) -> Self {
         let peer = stream.peer_addr().ok();
         let addr = peer.unwrap_or_else(|| {
-            std::net::SocketAddr::new(
-                std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
-                0,
-            )
+            std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)), 0)
         });
         Self {
             stream: TransportStream::Tcp(stream),
@@ -116,7 +113,7 @@ impl Connection {
     /// 创建 TLS 连接
     pub fn new_tls(stream: TlsStream<TcpStream>, peer_addr: std::net::SocketAddr) -> Self {
         Self {
-            stream: TransportStream::Tls(stream),
+            stream: TransportStream::Tls(Box::new(stream)),
             state: ConnectionState::Connected,
             read_buf: BytesMut::with_capacity(8192),
             frame_buf: BytesMut::with_capacity(8192),
@@ -183,12 +180,11 @@ impl Connection {
 ///
 /// 循环读取请求帧 → SASL 状态机检查 → BrokerRouter 处理 → 写入响应帧，
 /// 直到连接关闭或出错。
-pub async fn handle_connection(
-    stream: TcpStream,
-    router: Arc<BrokerRouter>,
-) {
+pub async fn handle_connection(stream: TcpStream, router: Arc<BrokerRouter>) {
     let peer = stream.peer_addr().ok();
-    let peer_str = peer.map(|a| a.to_string()).unwrap_or_else(|| "unknown".to_string());
+    let peer_str = peer
+        .map(|a| a.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
     debug!(peer = %peer_str, "New client connection");
 
     let conn = Connection::new(stream);
@@ -243,15 +239,16 @@ async fn handle_connection_inner(
         };
 
         // SASL 状态机: 认证前检查
-        if sasl_enabled && !conn.session.is_authenticated() {
-            if !BrokerRouter::is_pre_auth_api(api_key) {
-                warn!(
-                    peer = %peer_str,
-                    api_key = api_key,
-                    "Rejected non-auth API before SASL authentication"
-                );
-                break;
-            }
+        if sasl_enabled
+            && !conn.session.is_authenticated()
+            && !BrokerRouter::is_pre_auth_api(api_key)
+        {
+            warn!(
+                peer = %peer_str,
+                api_key = api_key,
+                "Rejected non-auth API before SASL authentication"
+            );
+            break;
         }
 
         // 通过 BrokerRouter 处理请求
@@ -273,7 +270,10 @@ async fn handle_connection_inner(
                             if let Some(username) = extract_sasl_username(&frame) {
                                 conn.session.set_authenticated(
                                     username,
-                                    conn.session.auth_state_mechanism().unwrap_or("PLAIN").to_string(),
+                                    conn.session
+                                        .auth_state_mechanism()
+                                        .unwrap_or("PLAIN")
+                                        .to_string(),
                                 );
                                 conn.state = ConnectionState::Authenticated;
                                 debug!(peer = %peer_str, "Client authenticated");
@@ -343,7 +343,10 @@ mod tests {
     fn test_connection_state_initial() {
         assert_eq!(ConnectionState::Connected, ConnectionState::Connected);
         assert_ne!(ConnectionState::Connected, ConnectionState::Closed);
-        assert_ne!(ConnectionState::SaslHandshaked, ConnectionState::Authenticated);
+        assert_ne!(
+            ConnectionState::SaslHandshaked,
+            ConnectionState::Authenticated
+        );
     }
 
     #[test]

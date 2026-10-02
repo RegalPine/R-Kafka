@@ -228,11 +228,7 @@ impl RackTopology {
             .flat_map(|bs| bs.iter())
             .filter(|b| b.is_alive)
             .count();
-        let no_rack_alive = self
-            .no_rack_brokers
-            .iter()
-            .filter(|b| b.is_alive)
-            .count();
+        let no_rack_alive = self.no_rack_brokers.iter().filter(|b| b.is_alive).count();
         rack_alive + no_rack_alive
     }
 
@@ -257,7 +253,10 @@ impl RackTopology {
 
     /// 检查两个 Broker 是否在不同机架上
     pub fn are_on_different_racks(&self, broker_a: i32, broker_b: i32) -> bool {
-        match (self.rack_for_broker(broker_a), self.rack_for_broker(broker_b)) {
+        match (
+            self.rack_for_broker(broker_a),
+            self.rack_for_broker(broker_b),
+        ) {
             (Some(rack_a), Some(rack_b)) => rack_a != rack_b,
             _ => false, // 无机架标识的认为在同一"逻辑机架"
         }
@@ -281,9 +280,7 @@ impl RackTopology {
         self.rack_brokers
             .iter()
             .filter(|(_, brokers)| brokers.iter().any(|b| b.is_alive))
-            .min_by_key(|(_, brokers)| {
-                brokers.iter().map(|b| b.partition_load).sum::<u32>()
-            })
+            .min_by_key(|(_, brokers)| brokers.iter().map(|b| b.partition_load).sum::<u32>())
             .map(|(rack, _)| rack.clone())
     }
 

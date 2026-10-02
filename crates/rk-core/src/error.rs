@@ -84,11 +84,17 @@ mod tests {
 
     #[test]
     fn test_error_display() {
-        let e = RkError::BufferUnderflow { need: 100, have: 50 };
+        let e = RkError::BufferUnderflow {
+            need: 100,
+            have: 50,
+        };
         assert!(e.to_string().contains("100"));
         assert!(e.to_string().contains("50"));
 
-        let e = RkError::RequestTooLarge { size: 200_000_000, max: 104_857_600 };
+        let e = RkError::RequestTooLarge {
+            size: 200_000_000,
+            max: 104_857_600,
+        };
         assert!(e.to_string().contains("200000000"));
     }
 

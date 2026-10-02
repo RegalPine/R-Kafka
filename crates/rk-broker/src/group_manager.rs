@@ -7,8 +7,17 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use dashmap::DashMap;
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use tracing::{debug, info};
+
+/// JoinGroup 响应元组类型 (generation_id, member_id, leader_id, protocol_name, members)
+pub type JoinGroupResult = (
+    i32,
+    String,
+    String,
+    Option<String>,
+    Vec<JoinGroupMemberInfo>,
+);
 
 /// 消费者组成员信息
 #[derive(Debug, Clone)]
@@ -68,6 +77,12 @@ pub struct GroupManager {
     member_id_counter: AtomicI32,
 }
 
+impl Default for GroupManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GroupManager {
     pub fn new() -> Self {
         Self {
@@ -98,8 +113,9 @@ impl GroupManager {
         group_instance_id: Option<&str>,
         protocol_type: &str,
         protocol_metadata: Vec<u8>,
-    ) -> Result<(i32, String, String, Option<String>, Vec<JoinGroupMemberInfo>)> {
-        let mut group = self.groups
+    ) -> Result<JoinGroupResult> {
+        let mut group = self
+            .groups
             .entry(group_id.to_string())
             .or_insert_with(|| ConsumerGroup::new(group_id.to_string()));
 
@@ -153,7 +169,13 @@ impl GroupManager {
             "Member joined group"
         );
 
-        Ok((generation_id, actual_member_id, leader_id, protocol_name, member_infos))
+        Ok((
+            generation_id,
+            actual_member_id,
+            leader_id,
+            protocol_name,
+            member_infos,
+        ))
     }
 
     /// 处理 SyncGroup: 设置成员分区分配
@@ -164,7 +186,8 @@ impl GroupManager {
         generation_id: i32,
         assignments: Vec<(String, Vec<u8>)>,
     ) -> Result<Vec<u8>> {
-        let mut group = self.groups
+        let mut group = self
+            .groups
             .get_mut(group_id)
             .ok_or_else(|| RkError::Protocol(format!("Group {} not found", group_id)))?;
 
@@ -203,13 +226,9 @@ impl GroupManager {
     }
 
     /// 处理 Heartbeat: 验证成员活跃
-    pub fn heartbeat(
-        &self,
-        group_id: &str,
-        member_id: &str,
-        generation_id: i32,
-    ) -> Result<()> {
-        let group = self.groups
+    pub fn heartbeat(&self, group_id: &str, member_id: &str, generation_id: i32) -> Result<()> {
+        let group = self
+            .groups
             .get(group_id)
             .ok_or_else(|| RkError::Protocol(format!("Group {} not found", group_id)))?;
 
@@ -231,12 +250,9 @@ impl GroupManager {
     }
 
     /// 处理 LeaveGroup: 移除成员
-    pub fn leave_group(
-        &self,
-        group_id: &str,
-        member_id: &str,
-    ) -> Result<()> {
-        let mut group = self.groups
+    pub fn leave_group(&self, group_id: &str, member_id: &str) -> Result<()> {
+        let mut group = self
+            .groups
             .get_mut(group_id)
             .ok_or_else(|| RkError::Protocol(format!("Group {} not found", group_id)))?;
 
@@ -252,12 +268,7 @@ impl GroupManager {
 
         // 如果 leader 离开，选新 leader
         if group.leader_id == member_id {
-            group.leader_id = group
-                .members
-                .keys()
-                .next()
-                .cloned()
-                .unwrap_or_default();
+            group.leader_id = group.members.keys().next().cloned().unwrap_or_default();
         }
 
         // 如果组空了，重置状态
@@ -309,9 +320,9 @@ mod tests {
     fn test_group_manager_join() {
         let gm = GroupManager::new();
 
-        let (gen, mid, leader, _proto, members) = gm.join_group(
-            "group-1", "", None, "consumer", vec![1, 2, 3],
-        ).unwrap();
+        let (gen, mid, leader, _proto, members) = gm
+            .join_group("group-1", "", None, "consumer", vec![1, 2, 3])
+            .unwrap();
 
         assert_eq!(gen, 1);
         assert!(!mid.is_empty());
@@ -323,10 +334,11 @@ mod tests {
     fn test_group_manager_join_multiple() {
         let gm = GroupManager::new();
 
-        gm.join_group("group-1", "", None, "consumer", vec![]).unwrap();
-        let (gen, _mid, _leader, _proto, members) = gm.join_group(
-            "group-1", "", None, "consumer", vec![],
-        ).unwrap();
+        gm.join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
+        let (gen, _mid, _leader, _proto, members) = gm
+            .join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
 
         assert_eq!(gen, 2);
         assert_eq!(members.len(), 2);
@@ -336,17 +348,19 @@ mod tests {
     fn test_group_manager_sync() {
         let gm = GroupManager::new();
 
-        let (gen, mid, _leader, _proto, _members) = gm.join_group(
-            "group-1", "", None, "consumer", vec![],
-        ).unwrap();
+        let (gen, mid, _leader, _proto, _members) = gm
+            .join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
 
         let assignment = vec![10, 20, 30];
-        let result = gm.sync_group(
-            "group-1",
-            &mid,
-            gen,
-            vec![(mid.clone(), assignment.clone())],
-        ).unwrap();
+        let result = gm
+            .sync_group(
+                "group-1",
+                &mid,
+                gen,
+                vec![(mid.clone(), assignment.clone())],
+            )
+            .unwrap();
 
         assert_eq!(result, assignment);
     }
@@ -355,9 +369,9 @@ mod tests {
     fn test_group_manager_heartbeat() {
         let gm = GroupManager::new();
 
-        let (gen, mid, _leader, _proto, _members) = gm.join_group(
-            "group-1", "", None, "consumer", vec![],
-        ).unwrap();
+        let (gen, mid, _leader, _proto, _members) = gm
+            .join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
 
         gm.heartbeat("group-1", &mid, gen).unwrap();
     }
@@ -366,9 +380,9 @@ mod tests {
     fn test_group_manager_heartbeat_wrong_generation() {
         let gm = GroupManager::new();
 
-        let (_gen, mid, _leader, _proto, _members) = gm.join_group(
-            "group-1", "", None, "consumer", vec![],
-        ).unwrap();
+        let (_gen, mid, _leader, _proto, _members) = gm
+            .join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
 
         let result = gm.heartbeat("group-1", &mid, 999);
         assert!(result.is_err());
@@ -378,9 +392,9 @@ mod tests {
     fn test_group_manager_leave() {
         let gm = GroupManager::new();
 
-        let (_gen, mid, _leader, _proto, _members) = gm.join_group(
-            "group-1", "", None, "consumer", vec![],
-        ).unwrap();
+        let (_gen, mid, _leader, _proto, _members) = gm
+            .join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
 
         gm.leave_group("group-1", &mid).unwrap();
 
@@ -393,12 +407,12 @@ mod tests {
     fn test_group_manager_leave_leader() {
         let gm = GroupManager::new();
 
-        let (_gen, _mid1, _leader, _proto, _members) = gm.join_group(
-            "group-1", "", None, "consumer", vec![],
-        ).unwrap();
-        let (_gen, _mid2, _leader, _proto, _members) = gm.join_group(
-            "group-1", "", None, "consumer", vec![],
-        ).unwrap();
+        let (_gen, _mid1, _leader, _proto, _members) = gm
+            .join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
+        let (_gen, _mid2, _leader, _proto, _members) = gm
+            .join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
 
         let group = gm.get_group("group-1").unwrap();
         let leader = group.leader_id.clone();
@@ -415,8 +429,10 @@ mod tests {
     fn test_group_manager_list_groups() {
         let gm = GroupManager::new();
 
-        gm.join_group("group-1", "", None, "consumer", vec![]).unwrap();
-        gm.join_group("group-2", "", None, "consumer", vec![]).unwrap();
+        gm.join_group("group-1", "", None, "consumer", vec![])
+            .unwrap();
+        gm.join_group("group-2", "", None, "consumer", vec![])
+            .unwrap();
 
         let groups = gm.list_groups();
         assert_eq!(groups.len(), 2);

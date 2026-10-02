@@ -105,31 +105,52 @@ impl KafkaAdmin {
     }
 
     /// 创建 Topic
-    pub async fn create_topic(&self, name: &str, partitions: i32, replication_factor: i16) -> ClientResult<()> {
+    pub async fn create_topic(
+        &self,
+        name: &str,
+        partitions: i32,
+        replication_factor: i16,
+    ) -> ClientResult<()> {
         if name.is_empty() {
-            return Err(ClientError::Config("Topic name cannot be empty".to_string()));
+            return Err(ClientError::Config(
+                "Topic name cannot be empty".to_string(),
+            ));
         }
         if partitions <= 0 {
             return Err(ClientError::Config("Partitions must be > 0".to_string()));
         }
         if replication_factor <= 0 {
-            return Err(ClientError::Config("Replication factor must be > 0".to_string()));
+            return Err(ClientError::Config(
+                "Replication factor must be > 0".to_string(),
+            ));
         }
 
         // Phase 3: 实际需要通过 CreateTopics API 发送请求
-        info!(topic = name, partitions = partitions, rf = replication_factor, "Topic created (simulated)");
+        info!(
+            topic = name,
+            partitions = partitions,
+            rf = replication_factor,
+            "Topic created (simulated)"
+        );
         Ok(())
     }
 
     /// 创建 Topic (带选项)
     pub async fn create_topic_with_options(&self, new_topic: &NewTopic) -> ClientResult<()> {
-        self.create_topic(&new_topic.name, new_topic.partitions, new_topic.replication_factor).await
+        self.create_topic(
+            &new_topic.name,
+            new_topic.partitions,
+            new_topic.replication_factor,
+        )
+        .await
     }
 
     /// 删除 Topic
     pub async fn delete_topic(&self, name: &str) -> ClientResult<()> {
         if name.is_empty() {
-            return Err(ClientError::Config("Topic name cannot be empty".to_string()));
+            return Err(ClientError::Config(
+                "Topic name cannot be empty".to_string(),
+            ));
         }
         // Phase 3: 实际需要通过 DeleteTopics API 发送请求
         info!(topic = name, "Topic deleted (simulated)");
@@ -139,7 +160,12 @@ impl KafkaAdmin {
     /// 列出 Topic
     pub async fn list_topics(&self) -> ClientResult<Vec<String>> {
         // Phase 3: 实际需要通过 Metadata API 获取
-        let topics = self.metadata_cache.all_topics().iter().map(|s| s.to_string()).collect();
+        let topics = self
+            .metadata_cache
+            .all_topics()
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         Ok(topics)
     }
 
@@ -168,7 +194,9 @@ impl KafkaAdmin {
 
     /// 获取集群 Broker 列表
     pub async fn list_brokers(&self) -> ClientResult<Vec<(i32, String)>> {
-        let brokers = self.metadata_cache.all_brokers()
+        let brokers = self
+            .metadata_cache
+            .all_brokers()
             .iter()
             .map(|b| (b.broker_id, b.address()))
             .collect();

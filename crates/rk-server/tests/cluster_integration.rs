@@ -4,8 +4,8 @@
 //! 验证 ClusterBootstrap + BrokerRegistry + MetadataStateMachine 协同工作。
 
 use rk_controller::{
-    ClusterBootstrap, ClusterBootstrapConfig, ClusterState,
-    MetadataStateMachine, initialize_cluster_metadata,
+    initialize_cluster_metadata, ClusterBootstrap, ClusterBootstrapConfig, ClusterState,
+    MetadataStateMachine,
 };
 use rk_core::types::BrokerId;
 
@@ -96,9 +96,15 @@ fn test_broker_unregister_causes_degradation() {
     let mut bootstrap = ClusterBootstrap::new(cluster_config(3));
 
     // 引导 3 节点 → Active
-    bootstrap.bootstrap_first_broker(broker(1), "10.0.0.1", 9092, None).unwrap();
-    bootstrap.register_broker(broker(2), "10.0.0.2", 9092, None).unwrap();
-    bootstrap.register_broker(broker(3), "10.0.0.3", 9092, None).unwrap();
+    bootstrap
+        .bootstrap_first_broker(broker(1), "10.0.0.1", 9092, None)
+        .unwrap();
+    bootstrap
+        .register_broker(broker(2), "10.0.0.2", 9092, None)
+        .unwrap();
+    bootstrap
+        .register_broker(broker(3), "10.0.0.3", 9092, None)
+        .unwrap();
     assert!(bootstrap.is_active());
 
     // Broker 3 注销 → Degraded

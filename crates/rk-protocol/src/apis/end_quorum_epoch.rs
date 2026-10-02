@@ -2,10 +2,10 @@
 //!
 //! KRaft 纪元结束: Leader 通知 Follower 当前纪元结束。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 
@@ -26,11 +26,16 @@ impl KafkaRequestDecoder for EndQuorumEpochRequest {
             let leader_id = reader.read_i32()?;
             let leader_epoch = reader.read_i32()?;
             let _tags = reader.read_tagged_fields()?;
-            Ok(Self { cluster_id, leader_id, leader_epoch })
+            Ok(Self {
+                cluster_id,
+                leader_id,
+                leader_epoch,
+            })
         } else {
-            Err(rk_core::error::RkError::Protocol(
-                format!("Unsupported EndQuorumEpoch API version: {}", version),
-            ))
+            Err(rk_core::error::RkError::Protocol(format!(
+                "Unsupported EndQuorumEpoch API version: {}",
+                version
+            )))
         }
     }
 }
@@ -68,8 +73,8 @@ mod tests {
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
         w.write_compact_string("cluster-1");
-        w.write_i32(1);       // leader_id
-        w.write_i32(10);      // leader_epoch
+        w.write_i32(1); // leader_id
+        w.write_i32(10); // leader_epoch
         w.write_tagged_fields(&[]);
 
         let mut reader = KafkaReader::new(&buf);

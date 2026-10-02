@@ -45,7 +45,11 @@ impl DeleteTopicsHandler {
 
     fn delete_topic(&self, topic_name: &str) -> DeleteTopicsResponseTopic {
         // 检查 topic 是否存在
-        if self.partition_manager.get_topic_metadata(topic_name).is_none() {
+        if self
+            .partition_manager
+            .get_topic_metadata(topic_name)
+            .is_none()
+        {
             return DeleteTopicsResponseTopic {
                 name: topic_name.to_string(),
                 error_code: KafkaErrorCode::UnknownTopicOrPartition,
@@ -78,14 +82,20 @@ mod tests {
 
     fn make_handler() -> DeleteTopicsHandler {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         DeleteTopicsHandler::new(pm)
     }
 
     #[test]
     fn test_delete_topic_success() {
         let handler = make_handler();
-        handler.partition_manager.get_or_create_topic("to-delete", 2);
+        handler
+            .partition_manager
+            .get_or_create_topic("to-delete", 2);
 
         let request = DeleteTopicsRequest {
             topic_names: vec!["to-delete".to_string()],
@@ -111,7 +121,10 @@ mod tests {
         };
 
         let response = handler.handle(request, 0).unwrap();
-        assert_eq!(response.topics[0].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            response.topics[0].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 
     #[test]
@@ -121,7 +134,11 @@ mod tests {
         handler.partition_manager.get_or_create_topic("topic-b", 1);
 
         let request = DeleteTopicsRequest {
-            topic_names: vec!["topic-a".to_string(), "topic-b".to_string(), "topic-c".to_string()],
+            topic_names: vec![
+                "topic-a".to_string(),
+                "topic-b".to_string(),
+                "topic-c".to_string(),
+            ],
             timeout_ms: 30000,
         };
 
@@ -129,7 +146,10 @@ mod tests {
         assert_eq!(response.topics.len(), 3);
         assert_eq!(response.topics[0].error_code, KafkaErrorCode::None);
         assert_eq!(response.topics[1].error_code, KafkaErrorCode::None);
-        assert_eq!(response.topics[2].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            response.topics[2].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 
     #[test]

@@ -69,7 +69,11 @@ impl IncrementalAlterConfigsHandler {
                 let topic_name = &resource.resource_name;
 
                 // 检查 topic 是否存在
-                if self.partition_manager.get_topic_metadata(topic_name).is_none() {
+                if self
+                    .partition_manager
+                    .get_topic_metadata(topic_name)
+                    .is_none()
+                {
                     return (
                         KafkaErrorCode::UnknownTopicOrPartition,
                         Some(format!("Topic '{}' not found", topic_name)),
@@ -83,7 +87,10 @@ impl IncrementalAlterConfigsHandler {
                         None => {
                             return (
                                 KafkaErrorCode::InvalidConfig,
-                                Some(format!("Unknown config operation: {}", config.config_operation)),
+                                Some(format!(
+                                    "Unknown config operation: {}",
+                                    config.config_operation
+                                )),
                             );
                         }
                     };
@@ -99,14 +106,13 @@ impl IncrementalAlterConfigsHandler {
                             }
                         }
                         IncrementalAlterConfigsOp::Delete => {
-                            self.partition_manager.remove_topic_config(
-                                topic_name,
-                                &config.name,
-                            );
+                            self.partition_manager
+                                .remove_topic_config(topic_name, &config.name);
                         }
                         IncrementalAlterConfigsOp::Append => {
                             // 追加到现有值 (逗号分隔)
-                            let current = self.partition_manager
+                            let current = self
+                                .partition_manager
                                 .get_topic_config(topic_name, &config.name)
                                 .unwrap_or_default();
                             if let Some(ref value) = config.value {
@@ -125,7 +131,8 @@ impl IncrementalAlterConfigsHandler {
                         IncrementalAlterConfigsOp::Subtract => {
                             // 从现有值中移除 (逗号分隔)
                             if let Some(ref value) = config.value {
-                                let current = self.partition_manager
+                                let current = self
+                                    .partition_manager
                                     .get_topic_config(topic_name, &config.name)
                                     .unwrap_or_default();
                                 let new_val: Vec<&str> = current
@@ -134,10 +141,8 @@ impl IncrementalAlterConfigsHandler {
                                     .collect();
                                 let new_val = new_val.join(",");
                                 if new_val.is_empty() {
-                                    self.partition_manager.remove_topic_config(
-                                        topic_name,
-                                        &config.name,
-                                    );
+                                    self.partition_manager
+                                        .remove_topic_config(topic_name, &config.name);
                                 } else {
                                     self.partition_manager.set_topic_config(
                                         topic_name,
@@ -153,15 +158,14 @@ impl IncrementalAlterConfigsHandler {
                 (KafkaErrorCode::None, None)
             }
             // Broker = 4: Phase 1 不支持 Broker 配置修改
-            4 => {
-                (KafkaErrorCode::None, None)
-            }
-            _ => {
-                (
-                    KafkaErrorCode::InvalidConfig,
-                    Some(format!("Unsupported resource type: {}", resource.resource_type)),
-                )
-            }
+            4 => (KafkaErrorCode::None, None),
+            _ => (
+                KafkaErrorCode::InvalidConfig,
+                Some(format!(
+                    "Unsupported resource type: {}",
+                    resource.resource_type
+                )),
+            ),
         }
     }
 }
@@ -173,7 +177,11 @@ mod tests {
 
     fn make_handler() -> IncrementalAlterConfigsHandler {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test-topic", 3);
         IncrementalAlterConfigsHandler::new(pm)
     }
@@ -205,7 +213,9 @@ mod tests {
         let handler = make_handler();
 
         // 先设置一个配置
-        handler.partition_manager.set_topic_config("test-topic", "retention.ms", "1000");
+        handler
+            .partition_manager
+            .set_topic_config("test-topic", "retention.ms", "1000");
 
         let request = IncrementalAlterConfigsRequest {
             resources: vec![IncrementalAlterConfigsRequestResource {
@@ -222,7 +232,10 @@ mod tests {
 
         let response = handler.handle(request, 0).unwrap();
         assert_eq!(response.responses[0].error_code, KafkaErrorCode::None);
-        assert!(handler.partition_manager.get_topic_config("test-topic", "retention.ms").is_none());
+        assert!(handler
+            .partition_manager
+            .get_topic_config("test-topic", "retention.ms")
+            .is_none());
     }
 
     #[test]
@@ -239,7 +252,10 @@ mod tests {
         };
 
         let response = handler.handle(request, 0).unwrap();
-        assert_eq!(response.responses[0].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            response.responses[0].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 
     #[test]

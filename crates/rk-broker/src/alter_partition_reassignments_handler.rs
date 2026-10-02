@@ -36,7 +36,9 @@ impl AlterPartitionReassignmentsHandler {
                 response_partitions.push(AlterPartitionReassignmentsResponsePartition {
                     index: part_req.index,
                     error_code: KafkaErrorCode::UnsupportedVersion,
-                    error_message: Some("Partition reassignment is not supported in single-broker mode".to_string()),
+                    error_message: Some(
+                        "Partition reassignment is not supported in single-broker mode".to_string(),
+                    ),
                 });
             }
             response_topics.push(AlterPartitionReassignmentsResponseTopic {
@@ -79,6 +81,9 @@ mod tests {
         };
         let resp = handler.handle(req, 0).unwrap();
         assert_eq!(resp.error_code, KafkaErrorCode::None);
-        assert_eq!(resp.topics[0].partitions[0].error_code, KafkaErrorCode::UnsupportedVersion);
+        assert_eq!(
+            resp.topics[0].partitions[0].error_code,
+            KafkaErrorCode::UnsupportedVersion
+        );
     }
 }

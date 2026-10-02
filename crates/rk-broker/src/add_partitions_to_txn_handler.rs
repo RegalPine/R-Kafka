@@ -19,7 +19,9 @@ pub struct AddPartitionsToTxnHandler {
 
 impl AddPartitionsToTxnHandler {
     pub fn new(producer_state_manager: Arc<ProducerStateManager>) -> Self {
-        Self { producer_state_manager }
+        Self {
+            producer_state_manager,
+        }
     }
 
     /// 处理 AddPartitionsToTxn 请求
@@ -36,7 +38,12 @@ impl AddPartitionsToTxnHandler {
 
         // v0-v2: 单事务模式
         if let Some(ref txn_id) = request.transactional_id {
-            return self.handle_single_txn(txn_id, request.producer_id, request.producer_epoch, &request.topics);
+            return self.handle_single_txn(
+                txn_id,
+                request.producer_id,
+                request.producer_epoch,
+                &request.topics,
+            );
         }
 
         // v3+: 批量事务模式
@@ -74,12 +81,8 @@ impl AddPartitionsToTxnHandler {
         producer_epoch: i16,
         topics: &[AddPartitionsToTxnRequestTopic],
     ) -> Result<AddPartitionsToTxnResponse> {
-        let topic_results = self.add_partitions_for_txn(
-            transactional_id,
-            producer_id,
-            producer_epoch,
-            topics,
-        );
+        let topic_results =
+            self.add_partitions_for_txn(transactional_id, producer_id, producer_epoch, topics);
 
         Ok(AddPartitionsToTxnResponse {
             results_by_topic: topic_results,
@@ -95,7 +98,11 @@ impl AddPartitionsToTxnHandler {
         topics: &[AddPartitionsToTxnRequestTopic],
     ) -> Vec<AddPartitionsToTxnResponseTopic> {
         // 确保生产者已注册
-        if self.producer_state_manager.get_producer_state(producer_id).is_none() {
+        if self
+            .producer_state_manager
+            .get_producer_state(producer_id)
+            .is_none()
+        {
             self.producer_state_manager.register_producer(
                 producer_id,
                 producer_epoch,

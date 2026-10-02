@@ -87,11 +87,7 @@ impl HighWatermarkManager {
     /// 更新 Leader LEO (在 append 之后)
     ///
     /// 同时更新 Leader 的 ReplicaInfo。
-    pub fn update_leader_leo(
-        &self,
-        replica_set: &mut PartitionReplicaSet,
-        new_leo: Offset,
-    ) {
+    pub fn update_leader_leo(&self, replica_set: &mut PartitionReplicaSet, new_leo: Offset) {
         trace!(
             topic = %replica_set.topic.0,
             partition = replica_set.partition.0,
@@ -169,8 +165,7 @@ impl HighWatermarkManager {
             .replicas
             .iter()
             .filter(|(&id, info)| {
-                id != replica_set.leader_id
-                    && info.role == crate::replica::ReplicaRole::Follower
+                id != replica_set.leader_id && info.role == crate::replica::ReplicaRole::Follower
             })
             .map(|(_, info)| info.lag_behind(replica_set.leader_leo))
             .collect();

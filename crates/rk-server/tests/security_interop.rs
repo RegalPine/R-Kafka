@@ -30,17 +30,31 @@
 use std::sync::{Arc, Mutex};
 
 use rk_security::{
-    // Pipeline
-    SecurityPipeline, SecurityPipelineConfig, SecurityContext, AuthzResult,
-    // SASL
-    SaslMechanism, UserDatabase,
-    // ACL
-    AclEngine, AclEntry, ResourceType, ResourcePattern, AclOperation,
-    topic_read_acl, topic_write_acl, group_read_acl, prefix_acl,
-    // Audit
-    AuditConfig, AuditLogger, AuditEventType,
     // API Permissions
-    api_permission, is_pre_auth_api,
+    api_permission,
+    group_read_acl,
+    is_pre_auth_api,
+    prefix_acl,
+    topic_read_acl,
+    topic_write_acl,
+    // ACL
+    AclEngine,
+    AclEntry,
+    AclOperation,
+    // Audit
+    AuditConfig,
+    AuditEventType,
+    AuditLogger,
+    AuthzResult,
+    ResourcePattern,
+    ResourceType,
+    // SASL
+    SaslMechanism,
+    SecurityContext,
+    // Pipeline
+    SecurityPipeline,
+    SecurityPipelineConfig,
+    UserDatabase,
 };
 
 // ─── 测试基础设施 ─────────────────────────────────────────────────────
@@ -50,7 +64,12 @@ fn setup_pipeline(
     sasl_enabled: bool,
     acl_enabled: bool,
     audit_enabled: bool,
-) -> (SecurityPipeline, Arc<UserDatabase>, Arc<AclEngine>, Arc<Mutex<AuditLogger>>) {
+) -> (
+    SecurityPipeline,
+    Arc<UserDatabase>,
+    Arc<AclEngine>,
+    Arc<Mutex<AuditLogger>>,
+) {
     let user_db = Arc::new(UserDatabase::new());
     user_db.add_user("alice", "alice-secret");
     user_db.add_user("bob", "bob-secret");
@@ -223,11 +242,21 @@ fn test_acl_deny_takes_priority() {
     pipeline.authenticate_plain(&mut ctx, &auth_data).unwrap();
 
     // alice 读 topic-normal → 允许
-    let result = pipeline.authorize(&ctx, &ResourceType::Topic, "topic-normal", &AclOperation::Read);
+    let result = pipeline.authorize(
+        &ctx,
+        &ResourceType::Topic,
+        "topic-normal",
+        &AclOperation::Read,
+    );
     assert!(matches!(result, AuthzResult::Allowed));
 
     // alice 读 topic-secret → 拒绝 (Deny 优先)
-    let result = pipeline.authorize(&ctx, &ResourceType::Topic, "topic-secret", &AclOperation::Read);
+    let result = pipeline.authorize(
+        &ctx,
+        &ResourceType::Topic,
+        "topic-secret",
+        &AclOperation::Read,
+    );
     assert!(matches!(result, AuthzResult::Denied(_)));
 }
 
@@ -250,12 +279,17 @@ fn test_super_user_bypass() {
         "any-topic",
         &AclOperation::Write,
     );
-    assert!(matches!(result, AuthzResult::Skipped), "Super user should bypass ACL (Skipped)");
+    assert!(
+        matches!(result, AuthzResult::Skipped),
+        "Super user should bypass ACL (Skipped)"
+    );
 
     // bob (非超级用户) 无规则 → 拒绝
     let mut ctx_bob = SecurityContext::new(SaslMechanism::Plain, "10.0.0.2", false);
     let auth_data = build_plain_auth("bob", "bob-secret");
-    pipeline.authenticate_plain(&mut ctx_bob, &auth_data).unwrap();
+    pipeline
+        .authenticate_plain(&mut ctx_bob, &auth_data)
+        .unwrap();
 
     let result = pipeline.authorize(
         &ctx_bob,
@@ -280,8 +314,16 @@ fn test_unauthenticated_user_denied() {
     let ctx = SecurityContext::new(SaslMechanism::Plain, "10.0.0.1", false);
 
     // 未认证 → 拒绝
-    let result = pipeline.authorize(&ctx, &ResourceType::Topic, "public-topic", &AclOperation::Read);
-    assert!(matches!(result, AuthzResult::Denied(_)), "Unauthenticated should be denied");
+    let result = pipeline.authorize(
+        &ctx,
+        &ResourceType::Topic,
+        "public-topic",
+        &AclOperation::Read,
+    );
+    assert!(
+        matches!(result, AuthzResult::Denied(_)),
+        "Unauthenticated should be denied"
+    );
 }
 
 // ─── 测试 4: ACL 未启用时跳过授权 ──────────────────────────────────────
@@ -333,15 +375,30 @@ fn test_prefix_acl_matching() {
     pipeline.authenticate_plain(&mut ctx, &auth_data).unwrap();
 
     // dev-orders → 允许 (前缀匹配)
-    let result = pipeline.authorize(&ctx, &ResourceType::Topic, "dev-orders", &AclOperation::Read);
+    let result = pipeline.authorize(
+        &ctx,
+        &ResourceType::Topic,
+        "dev-orders",
+        &AclOperation::Read,
+    );
     assert!(matches!(result, AuthzResult::Allowed));
 
     // dev-users → 允许
-    let result = pipeline.authorize(&ctx, &ResourceType::Topic, "dev-users", &AclOperation::Write);
+    let result = pipeline.authorize(
+        &ctx,
+        &ResourceType::Topic,
+        "dev-users",
+        &AclOperation::Write,
+    );
     assert!(matches!(result, AuthzResult::Allowed));
 
     // prod-orders → 拒绝 (不匹配前缀)
-    let result = pipeline.authorize(&ctx, &ResourceType::Topic, "prod-orders", &AclOperation::Read);
+    let result = pipeline.authorize(
+        &ctx,
+        &ResourceType::Topic,
+        "prod-orders",
+        &AclOperation::Read,
+    );
     assert!(matches!(result, AuthzResult::Denied(_)));
 }
 
@@ -427,10 +484,14 @@ fn test_pre_auth_apis() {
 /// 验证 BrokerRouter.check_authorization() 端到端
 #[test]
 fn test_broker_router_acl_integration() {
-    use rk_broker::{BrokerRouter, PartitionManager, OffsetManager};
+    use rk_broker::{BrokerRouter, OffsetManager, PartitionManager};
 
     let dir = tempfile::tempdir().unwrap();
-    let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+    let pm = Arc::new(PartitionManager::new(
+        dir.path().to_path_buf(),
+        1_073_741_824,
+        1,
+    ));
     let offset_manager = Arc::new(OffsetManager::new(None));
 
     let mut router = BrokerRouter::with_offset_manager(
@@ -471,10 +532,20 @@ fn test_audit_log_completeness() {
     pipeline.authenticate_plain(&mut ctx, &auth_data).unwrap();
 
     // 2. 授权允许
-    pipeline.authorize(&ctx, &ResourceType::Topic, "topic-orders", &AclOperation::Read);
+    pipeline.authorize(
+        &ctx,
+        &ResourceType::Topic,
+        "topic-orders",
+        &AclOperation::Read,
+    );
 
     // 3. 授权拒绝
-    pipeline.authorize(&ctx, &ResourceType::Topic, "topic-secret", &AclOperation::Read);
+    pipeline.authorize(
+        &ctx,
+        &ResourceType::Topic,
+        "topic-secret",
+        &AclOperation::Read,
+    );
 
     // 4. 认证失败
     let mut ctx_bad = SecurityContext::new(SaslMechanism::Plain, "10.0.0.99", false);
@@ -486,7 +557,11 @@ fn test_audit_log_completeness() {
     let events = logger.recent_events(20);
 
     // 至少有: 认证成功 + 认证失败 + ACL allow + ACL deny
-    assert!(events.len() >= 3, "Should have at least 3 audit events, got {}", events.len());
+    assert!(
+        events.len() >= 3,
+        "Should have at least 3 audit events, got {}",
+        events.len()
+    );
 
     // 检查事件类型覆盖
     let event_types: Vec<AuditEventType> = events.iter().map(|e| e.event_type.clone()).collect();
@@ -528,7 +603,10 @@ fn test_multi_user_concurrent_security() {
             // alice 读 topic-b → 拒绝
             let r2 = p.authorize(&ctx, &ResourceType::Topic, "topic-b", &AclOperation::Read);
 
-            (matches!(r1, AuthzResult::Allowed), matches!(r2, AuthzResult::Denied(_)))
+            (
+                matches!(r1, AuthzResult::Allowed),
+                matches!(r2, AuthzResult::Denied(_)),
+            )
         })
     };
 
@@ -544,7 +622,10 @@ fn test_multi_user_concurrent_security() {
             // bob 读 topic-a → 拒绝
             let r2 = p.authorize(&ctx, &ResourceType::Topic, "topic-a", &AclOperation::Read);
 
-            (matches!(r1, AuthzResult::Allowed), matches!(r2, AuthzResult::Denied(_)))
+            (
+                matches!(r1, AuthzResult::Allowed),
+                matches!(r2, AuthzResult::Denied(_)),
+            )
         })
     };
 
@@ -612,7 +693,9 @@ fn test_full_auth_authz_audit_chain() {
     // Producer 认证
     let mut producer_ctx = SecurityContext::new(SaslMechanism::Plain, "10.0.1.10", true);
     let auth = build_plain_auth("producer-svc", "producer-pass");
-    pipeline2.authenticate_plain(&mut producer_ctx, &auth).unwrap();
+    pipeline2
+        .authenticate_plain(&mut producer_ctx, &auth)
+        .unwrap();
     assert_eq!(producer_ctx.principal(), Some("User:producer-svc"));
 
     // Producer 写 events → 允许
@@ -636,7 +719,9 @@ fn test_full_auth_authz_audit_chain() {
     // ═══ Consumer 连接 ═══
     let mut consumer_ctx = SecurityContext::new(SaslMechanism::Plain, "10.0.1.20", true);
     let auth = build_plain_auth("consumer-svc", "consumer-pass");
-    pipeline2.authenticate_plain(&mut consumer_ctx, &auth).unwrap();
+    pipeline2
+        .authenticate_plain(&mut consumer_ctx, &auth)
+        .unwrap();
 
     // Consumer 读 events → 允许
     let result = pipeline2.authorize(
@@ -671,7 +756,8 @@ fn test_full_auth_authz_audit_chain() {
     assert!(events.len() >= 4, "Should have auth + authz events");
 
     // 有认证成功事件
-    let auth_success_count = events.iter()
+    let auth_success_count = events
+        .iter()
         .filter(|e| e.event_type == AuditEventType::AuthSuccess)
         .count();
     assert_eq!(auth_success_count, 2, "Should have 2 auth success events");
@@ -703,11 +789,17 @@ fn test_multiple_sasl_mechanisms() {
 
     // SCRAM-SHA-256
     let ctx_sha256 = SecurityContext::new(SaslMechanism::ScramSha256, "10.0.0.1", true);
-    assert_eq!(*ctx_sha256.session().mechanism(), SaslMechanism::ScramSha256);
+    assert_eq!(
+        *ctx_sha256.session().mechanism(),
+        SaslMechanism::ScramSha256
+    );
 
     // SCRAM-SHA-512
     let ctx_sha512 = SecurityContext::new(SaslMechanism::ScramSha512, "10.0.0.1", true);
-    assert_eq!(*ctx_sha512.session().mechanism(), SaslMechanism::ScramSha512);
+    assert_eq!(
+        *ctx_sha512.session().mechanism(),
+        SaslMechanism::ScramSha512
+    );
 }
 
 // ─── 测试 15: 并发 ACL 规则变更 ────────────────────────────────────────

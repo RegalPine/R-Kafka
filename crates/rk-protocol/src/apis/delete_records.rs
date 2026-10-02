@@ -3,10 +3,10 @@
 //! 删除指定 partition 中指定偏移量之前的记录 (日志截断)。
 //! 实际上是将 log_start_offset 前移到指定位置。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ──────────────────────────────────────────────────────────
 

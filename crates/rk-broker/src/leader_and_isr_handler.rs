@@ -11,10 +11,16 @@ pub struct LeaderAndIsrHandler {
 
 impl LeaderAndIsrHandler {
     pub fn new(broker_id: i32) -> Self {
-        Self { _broker_id: broker_id }
+        Self {
+            _broker_id: broker_id,
+        }
     }
 
-    pub fn handle(&self, request: LeaderAndIsrRequest, _version: i16) -> Result<LeaderAndIsrResponse> {
+    pub fn handle(
+        &self,
+        request: LeaderAndIsrRequest,
+        _version: i16,
+    ) -> Result<LeaderAndIsrResponse> {
         debug!(
             controller_id = request.controller_id,
             controller_epoch = request.controller_epoch,
@@ -22,13 +28,15 @@ impl LeaderAndIsrHandler {
             "LeaderAndIsr request received"
         );
 
-        let partition_errors = request.partition_states.iter().map(|ps| {
-            LeaderAndIsrPartitionError {
+        let partition_errors = request
+            .partition_states
+            .iter()
+            .map(|ps| LeaderAndIsrPartitionError {
                 topic_name: ps.topic_name.clone(),
                 partition_index: ps.partition_index,
                 error_code: KafkaErrorCode::None,
-            }
-        }).collect();
+            })
+            .collect();
 
         Ok(LeaderAndIsrResponse {
             throttle_time_ms: 0,

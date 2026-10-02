@@ -8,11 +8,11 @@
 //! 生命周期: Created → Active (写入中) → Sealed (已满) → Deleted
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{Write, Seek, SeekFrom};
+use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use rk_core::error::{RkError, Result};
-use rk_protocol::record::{RecordBatchHeader, HEADER_SIZE, decode_batch_header};
+use rk_core::error::{Result, RkError};
+use rk_protocol::record::{decode_batch_header, RecordBatchHeader, HEADER_SIZE};
 use rk_protocol::types::KafkaReader;
 
 use crate::index::{OffsetIndex, TimeIndex};
@@ -94,10 +94,7 @@ impl LogSegment {
         let index_path = dir.join(format!("{}.index", base_name));
         let timeindex_path = dir.join(format!("{}.timeindex", base_name));
 
-        let log_file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&log_path)?;
+        let log_file = OpenOptions::new().read(true).write(true).open(&log_path)?;
 
         let write_position = log_file.metadata()?.len();
 
@@ -119,7 +116,8 @@ impl LogSegment {
                 Ok(hdr) => {
                     let last_rel = (hdr.base_offset as u64)
                         .wrapping_sub(base_offset)
-                        .wrapping_add(hdr.last_offset_delta as u64) as u32;
+                        .wrapping_add(hdr.last_offset_delta as u64)
+                        as u32;
                     (hdr.max_timestamp, last_rel, batch_count)
                 }
                 Err(_) => (i64::MIN, 0u32, batch_count),
@@ -168,18 +166,19 @@ impl LogSegment {
 
         // 更新稀疏索引 (每写入一个 batch 添加一条索引条目)
         let relative_offset = (hdr.base_offset as u64).wrapping_sub(self.base_offset) as u32;
-        self.offset_index.append(relative_offset, batch_file_offset as u32)?;
+        self.offset_index
+            .append(relative_offset, batch_file_offset as u32)?;
 
         // 更新时间索引
         if hdr.max_timestamp > self.max_timestamp {
             self.max_timestamp = hdr.max_timestamp;
         }
-        self.time_index.append(hdr.base_timestamp, relative_offset)?;
+        self.time_index
+            .append(hdr.base_timestamp, relative_offset)?;
 
         // 更新元数据
         self.batch_count += 1;
-        self.last_relative_offset = relative_offset
-            .wrapping_add(hdr.last_offset_delta as u32);
+        self.last_relative_offset = relative_offset.wrapping_add(hdr.last_offset_delta as u32);
 
         Ok(first_offset)
     }
@@ -264,9 +263,15 @@ impl LogSegment {
         let timeindex_path = self.dir_path.join(format!("{}.timeindex", base_name));
 
         drop(self.log_file);
-        if log_path.exists() { fs::remove_file(&log_path)?; }
-        if index_path.exists() { fs::remove_file(&index_path)?; }
-        if timeindex_path.exists() { fs::remove_file(&timeindex_path)?; }
+        if log_path.exists() {
+            fs::remove_file(&log_path)?;
+        }
+        if index_path.exists() {
+            fs::remove_file(&index_path)?;
+        }
+        if timeindex_path.exists() {
+            fs::remove_file(&timeindex_path)?;
+        }
 
         Ok(())
     }
@@ -301,7 +306,8 @@ impl LogSegment {
 
             let relative_offset = (hdr.base_offset as u64).wrapping_sub(self.base_offset) as u32;
             self.offset_index.append(relative_offset, *pos as u32)?;
-            self.time_index.append(hdr.base_timestamp, relative_offset)?;
+            self.time_index
+                .append(hdr.base_timestamp, relative_offset)?;
 
             if hdr.max_timestamp > max_ts {
                 max_ts = hdr.max_timestamp;
@@ -329,7 +335,16 @@ mod tests {
     fn make_test_batch(base_offset: i64, record_count: i32) -> Vec<u8> {
         let records = vec![0u8; record_count as usize * 10]; // fake records
         build_batch_bytes(
-            base_offset, 1, 0, 1000, 2000, -1, -1, -1, &records, record_count,
+            base_offset,
+            1,
+            0,
+            1000,
+            2000,
+            -1,
+            -1,
+            -1,
+            &records,
+            record_count,
         )
     }
 

@@ -88,7 +88,10 @@ mod tests {
         };
         let resp = handler.handle(req, 0).unwrap();
         assert_eq!(resp.error_code, KafkaErrorCode::None);
-        assert_eq!(resp.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            resp.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
 
         // 验证偏移量已删除
         assert_eq!(om.get_offset("group1", "test", 0), None);

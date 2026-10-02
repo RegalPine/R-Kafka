@@ -200,11 +200,7 @@ impl SecurityPipeline {
     // ─── 认证 ───────────────────────────────────────────────────
 
     /// 处理 SASL PLAIN 认证
-    pub fn authenticate_plain(
-        &self,
-        ctx: &mut SecurityContext,
-        data: &[u8],
-    ) -> Result<Vec<u8>> {
+    pub fn authenticate_plain(&self, ctx: &mut SecurityContext, data: &[u8]) -> Result<Vec<u8>> {
         let result = ctx.session_mut().authenticate_plain(data, &self.user_db);
 
         match &result {
@@ -244,11 +240,7 @@ impl SecurityPipeline {
     }
 
     /// 处理 SCRAM client-first
-    pub fn scram_client_first(
-        &self,
-        ctx: &mut SecurityContext,
-        data: &[u8],
-    ) -> Result<Vec<u8>> {
+    pub fn scram_client_first(&self, ctx: &mut SecurityContext, data: &[u8]) -> Result<Vec<u8>> {
         let mechanism = format!("{}", ctx.session().mechanism());
         let result = ctx.session_mut().scram_client_first(data, &self.user_db);
 
@@ -266,11 +258,7 @@ impl SecurityPipeline {
     }
 
     /// 处理 SCRAM client-final
-    pub fn scram_client_final(
-        &self,
-        ctx: &mut SecurityContext,
-        data: &[u8],
-    ) -> Result<Vec<u8>> {
+    pub fn scram_client_final(&self, ctx: &mut SecurityContext, data: &[u8]) -> Result<Vec<u8>> {
         let mechanism = format!("{}", ctx.session().mechanism());
         let result = ctx.session_mut().scram_client_final(data, &self.user_db);
 
@@ -531,15 +519,12 @@ mod tests {
         let mut ctx = make_ctx("10.0.0.1");
 
         // 先认证 alice
-        pipeline.authenticate_plain(&mut ctx, b"\0alice\0password123").unwrap();
+        pipeline
+            .authenticate_plain(&mut ctx, b"\0alice\0password123")
+            .unwrap();
 
         // alice 读 topic-a → 允许
-        let result = pipeline.authorize(
-            &ctx,
-            &ResourceType::Topic,
-            "topic-a",
-            &AclOperation::Read,
-        );
+        let result = pipeline.authorize(&ctx, &ResourceType::Topic, "topic-a", &AclOperation::Read);
         assert_eq!(result, AuthzResult::Allowed);
     }
 
@@ -549,15 +534,12 @@ mod tests {
         let mut ctx = make_ctx("10.0.0.1");
 
         // 认证 alice
-        pipeline.authenticate_plain(&mut ctx, b"\0alice\0password123").unwrap();
+        pipeline
+            .authenticate_plain(&mut ctx, b"\0alice\0password123")
+            .unwrap();
 
         // alice 读 topic-b → 无规则 → 默认拒绝
-        let result = pipeline.authorize(
-            &ctx,
-            &ResourceType::Topic,
-            "topic-b",
-            &AclOperation::Read,
-        );
+        let result = pipeline.authorize(&ctx, &ResourceType::Topic, "topic-b", &AclOperation::Read);
         assert!(matches!(result, AuthzResult::Denied(_)));
     }
 
@@ -567,7 +549,9 @@ mod tests {
         let mut ctx = make_ctx("10.0.0.1");
 
         // 认证 admin (超级用户)
-        pipeline.authenticate_plain(&mut ctx, b"\0admin\0admin_pass").unwrap();
+        pipeline
+            .authenticate_plain(&mut ctx, b"\0admin\0admin_pass")
+            .unwrap();
 
         // admin 任何操作 → 跳过 ACL
         let result = pipeline.authorize(
@@ -585,12 +569,7 @@ mod tests {
         let ctx = make_ctx("10.0.0.1");
 
         // 未认证 → 拒绝
-        let result = pipeline.authorize(
-            &ctx,
-            &ResourceType::Topic,
-            "topic-a",
-            &AclOperation::Read,
-        );
+        let result = pipeline.authorize(&ctx, &ResourceType::Topic, "topic-a", &AclOperation::Read);
         assert!(matches!(result, AuthzResult::Denied(_)));
     }
 
@@ -600,7 +579,9 @@ mod tests {
         let mut ctx = make_ctx("10.0.0.2");
 
         // 认证 bob
-        pipeline.authenticate_plain(&mut ctx, b"\0bob\0secret456").unwrap();
+        pipeline
+            .authenticate_plain(&mut ctx, b"\0bob\0secret456")
+            .unwrap();
 
         // bob 读任何 topic → 允许 (ResourcePattern::Any)
         assert_eq!(
@@ -625,13 +606,17 @@ mod tests {
         let mut ctx = make_ctx("10.0.0.1");
 
         // 认证 → 产生审计事件
-        pipeline.authenticate_plain(&mut ctx, b"\0alice\0password123").unwrap();
+        pipeline
+            .authenticate_plain(&mut ctx, b"\0alice\0password123")
+            .unwrap();
 
         let logger = pipeline.audit_logger().lock().unwrap();
         let events = logger.recent_events(10);
         assert!(!events.is_empty());
         // 应该有 AuthSuccess 事件
-        assert!(events.iter().any(|e| e.event_type == AuditEventType::AuthSuccess));
+        assert!(events
+            .iter()
+            .any(|e| e.event_type == AuditEventType::AuthSuccess));
     }
 
     #[test]

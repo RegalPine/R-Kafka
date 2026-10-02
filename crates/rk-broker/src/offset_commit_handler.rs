@@ -114,10 +114,16 @@ mod tests {
 
         let response = handler.handle(request, 0).unwrap();
         assert_eq!(response.topics.len(), 1);
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
 
         // 验证已提交
-        let offset = handler.offset_manager().fetch_offset("group-1", "topic-a", 0).unwrap();
+        let offset = handler
+            .offset_manager()
+            .fetch_offset("group-1", "topic-a", 0)
+            .unwrap();
         assert_eq!(offset.offset, 42);
     }
 
@@ -130,33 +136,37 @@ mod tests {
             member_id: "member-1".to_string(),
             group_instance_id: None,
             retention_time_ms: -1,
-            topics: vec![
-                OffsetCommitRequestTopic {
-                    name: "topic-a".to_string(),
-                    partitions: vec![
-                        OffsetCommitRequestPartition {
-                            index: 0,
-                            committed_offset: 10,
-                            committed_leader_epoch: -1,
-                            commit_timestamp: -1,
-                            metadata: None,
-                        },
-                        OffsetCommitRequestPartition {
-                            index: 1,
-                            committed_offset: 20,
-                            committed_leader_epoch: -1,
-                            commit_timestamp: -1,
-                            metadata: Some("meta".to_string()),
-                        },
-                    ],
-                },
-            ],
+            topics: vec![OffsetCommitRequestTopic {
+                name: "topic-a".to_string(),
+                partitions: vec![
+                    OffsetCommitRequestPartition {
+                        index: 0,
+                        committed_offset: 10,
+                        committed_leader_epoch: -1,
+                        commit_timestamp: -1,
+                        metadata: None,
+                    },
+                    OffsetCommitRequestPartition {
+                        index: 1,
+                        committed_offset: 20,
+                        committed_leader_epoch: -1,
+                        commit_timestamp: -1,
+                        metadata: Some("meta".to_string()),
+                    },
+                ],
+            }],
         };
 
         let response = handler.handle(request, 0).unwrap();
         assert_eq!(response.topics[0].partitions.len(), 2);
-        assert_eq!(response.topics[0].partitions[0].error_code, KafkaErrorCode::None);
-        assert_eq!(response.topics[0].partitions[1].error_code, KafkaErrorCode::None);
+        assert_eq!(
+            response.topics[0].partitions[0].error_code,
+            KafkaErrorCode::None
+        );
+        assert_eq!(
+            response.topics[0].partitions[1].error_code,
+            KafkaErrorCode::None
+        );
     }
 
     #[test]
@@ -203,7 +213,10 @@ mod tests {
         };
         handler.handle(request2, 0).unwrap();
 
-        let offset = handler.offset_manager().fetch_offset("group-1", "topic-a", 0).unwrap();
+        let offset = handler
+            .offset_manager()
+            .fetch_offset("group-1", "topic-a", 0)
+            .unwrap();
         assert_eq!(offset.offset, 50);
     }
 }

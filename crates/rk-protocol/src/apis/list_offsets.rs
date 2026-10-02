@@ -2,10 +2,10 @@
 //!
 //! 实现 ListOffsetsRequest / ListOffsetsResponse，支持 v0-v8。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 // ─── Request ─────────────────────────────────────────────────────────
 
@@ -37,11 +37,7 @@ impl KafkaRequestDecoder for ListOffsetsRequest {
 
         let replica_id = reader.read_i32()?;
 
-        let isolation_level = if version >= 2 {
-            reader.read_i8()?
-        } else {
-            0
-        };
+        let isolation_level = if version >= 2 { reader.read_i8()? } else { 0 };
 
         let topics = if is_flex {
             reader.read_compact_array(|r| {
@@ -82,7 +78,11 @@ impl KafkaRequestDecoder for ListOffsetsRequest {
             let _ = reader.read_tagged_fields()?;
         }
 
-        Ok(Self { replica_id, isolation_level, topics })
+        Ok(Self {
+            replica_id,
+            isolation_level,
+            topics,
+        })
     }
 }
 

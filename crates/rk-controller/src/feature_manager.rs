@@ -60,11 +60,7 @@ impl FeatureManager {
     }
 
     /// 注册/更新某 Broker 的 Feature 列表
-    pub fn update_broker_features(
-        &self,
-        broker_id: BrokerId,
-        features: Vec<BrokerFeature>,
-    ) {
+    pub fn update_broker_features(&self, broker_id: BrokerId, features: Vec<BrokerFeature>) {
         let mut map = self.broker_features.write().unwrap();
         map.insert(broker_id, features);
     }
@@ -290,10 +286,7 @@ mod tests {
     #[test]
     fn test_single_broker() {
         let fm = FeatureManager::new();
-        fm.update_broker_features(
-            BrokerId(1),
-            vec![make_feature("metadata.version", 0, 17)],
-        );
+        fm.update_broker_features(BrokerId(1), vec![make_feature("metadata.version", 0, 17)]);
 
         let finalized = fm.compute_finalized();
         assert_eq!(finalized.len(), 1);
@@ -305,14 +298,8 @@ mod tests {
     #[test]
     fn test_two_brokers_compatible() {
         let fm = FeatureManager::new();
-        fm.update_broker_features(
-            BrokerId(1),
-            vec![make_feature("metadata.version", 0, 17)],
-        );
-        fm.update_broker_features(
-            BrokerId(2),
-            vec![make_feature("metadata.version", 0, 16)],
-        );
+        fm.update_broker_features(BrokerId(1), vec![make_feature("metadata.version", 0, 17)]);
+        fm.update_broker_features(BrokerId(2), vec![make_feature("metadata.version", 0, 16)]);
 
         let finalized = fm.compute_finalized();
         assert_eq!(finalized.len(), 1);
@@ -323,15 +310,9 @@ mod tests {
     #[test]
     fn test_incompatible_broker() {
         let fm = FeatureManager::new();
-        fm.update_broker_features(
-            BrokerId(1),
-            vec![make_feature("metadata.version", 0, 16)],
-        );
+        fm.update_broker_features(BrokerId(1), vec![make_feature("metadata.version", 0, 16)]);
         // Broker 3 要求最低版本 17, 但集群最高只支持 16
-        fm.update_broker_features(
-            BrokerId(3),
-            vec![make_feature("metadata.version", 17, 17)],
-        );
+        fm.update_broker_features(BrokerId(3), vec![make_feature("metadata.version", 17, 17)]);
 
         assert!(!fm.is_compatible());
         let incompatible = fm.incompatible_brokers();
@@ -359,10 +340,16 @@ mod tests {
         let finalized = fm.compute_finalized();
         assert_eq!(finalized.len(), 2);
 
-        let mv = finalized.iter().find(|f| f.name == "metadata.version").unwrap();
+        let mv = finalized
+            .iter()
+            .find(|f| f.name == "metadata.version")
+            .unwrap();
         assert_eq!(mv.version, 16);
 
-        let gv = finalized.iter().find(|f| f.name == "group.version").unwrap();
+        let gv = finalized
+            .iter()
+            .find(|f| f.name == "group.version")
+            .unwrap();
         assert_eq!(gv.version, 4);
     }
 
@@ -377,10 +364,7 @@ mod tests {
             ],
         );
         // Broker 2 不支持 group.version
-        fm.update_broker_features(
-            BrokerId(2),
-            vec![make_feature("metadata.version", 0, 16)],
-        );
+        fm.update_broker_features(BrokerId(2), vec![make_feature("metadata.version", 0, 16)]);
 
         let finalized = fm.compute_finalized();
         // group.version 不在 finalized 中 (不是所有 Broker 都支持)
@@ -391,14 +375,8 @@ mod tests {
     #[test]
     fn test_remove_broker() {
         let fm = FeatureManager::new();
-        fm.update_broker_features(
-            BrokerId(1),
-            vec![make_feature("metadata.version", 0, 17)],
-        );
-        fm.update_broker_features(
-            BrokerId(2),
-            vec![make_feature("metadata.version", 0, 16)],
-        );
+        fm.update_broker_features(BrokerId(1), vec![make_feature("metadata.version", 0, 17)]);
+        fm.update_broker_features(BrokerId(2), vec![make_feature("metadata.version", 0, 16)]);
 
         assert_eq!(fm.broker_count(), 2);
         assert_eq!(fm.compute_finalized()[0].version, 16);

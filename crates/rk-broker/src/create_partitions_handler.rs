@@ -81,9 +81,7 @@ impl CreatePartitionsHandler {
                     return CreatePartitionsResponseResult {
                         name: topic_name.to_string(),
                         error_code: KafkaErrorCode::InvalidPartitions,
-                        error_message: Some(format!(
-                            "Topic already has {} partitions", current
-                        )),
+                        error_message: Some(format!("Topic already has {} partitions", current)),
                     };
                 }
             }
@@ -123,7 +121,11 @@ mod tests {
 
     fn make_handler() -> CreatePartitionsHandler {
         let dir = tempdir().unwrap();
-        let pm = Arc::new(PartitionManager::new(dir.path().to_path_buf(), 1_073_741_824, 1));
+        let pm = Arc::new(PartitionManager::new(
+            dir.path().to_path_buf(),
+            1_073_741_824,
+            1,
+        ));
         pm.get_or_create_topic("test", 3);
         CreatePartitionsHandler::new(pm)
     }
@@ -158,7 +160,10 @@ mod tests {
             validate_only: false,
         };
         let resp = handler.handle(req, 0).unwrap();
-        assert_eq!(resp.results[0].error_code, KafkaErrorCode::UnknownTopicOrPartition);
+        assert_eq!(
+            resp.results[0].error_code,
+            KafkaErrorCode::UnknownTopicOrPartition
+        );
     }
 
     #[test]
@@ -176,7 +181,10 @@ mod tests {
         let resp = handler.handle(req, 0).unwrap();
         assert_eq!(resp.results[0].error_code, KafkaErrorCode::None);
         // 实际分区数未变
-        assert_eq!(handler.partition_manager.get_partition_count("test"), Some(3));
+        assert_eq!(
+            handler.partition_manager.get_partition_count("test"),
+            Some(3)
+        );
     }
 
     #[test]
@@ -192,6 +200,9 @@ mod tests {
             validate_only: false,
         };
         let resp = handler.handle(req, 0).unwrap();
-        assert_eq!(resp.results[0].error_code, KafkaErrorCode::InvalidPartitions);
+        assert_eq!(
+            resp.results[0].error_code,
+            KafkaErrorCode::InvalidPartitions
+        );
     }
 }

@@ -2,10 +2,10 @@
 //!
 //! Broker 优雅关闭前: 请求 Controller 迁移 Partition。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 #[derive(Debug, Clone)]
 pub struct ControlledShutdownRequest {
@@ -18,7 +18,10 @@ impl KafkaRequestDecoder for ControlledShutdownRequest {
         let broker_id = reader.read_i32()?;
         let broker_epoch = reader.read_i64()?;
         let _tags = reader.read_tagged_fields()?;
-        Ok(Self { broker_id, broker_epoch })
+        Ok(Self {
+            broker_id,
+            broker_epoch,
+        })
     }
 }
 
@@ -67,10 +70,7 @@ mod tests {
         let resp = ControlledShutdownResponse {
             throttle_time_ms: 0,
             error_code: KafkaErrorCode::None,
-            remaining_partitions: vec![
-                ("topic-a".to_string(), 0),
-                ("topic-b".to_string(), 1),
-            ],
+            remaining_partitions: vec![("topic-a".to_string(), 0), ("topic-b".to_string(), 1)],
         };
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);

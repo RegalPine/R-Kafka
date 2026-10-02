@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "r-kafka.fullname" . }}
+  labels:
+    {{- include "r-kafka.labels" . | nindent 4 }}
+data:
+  r-kafka.toml: |
+    [broker]
+    host = "0.0.0.0"
+    port = {{ .Values.broker.port }}
+    {{- if .Values.broker.rack }}
+    rack = {{ .Values.broker.rack | quote }}
+    {{- end }}
+
+    [storage]
+    data_dir = {{ .Values.storage.dataDir | quote }}
+    segment_max_size = {{ .Values.storage.segmentMaxSize }}
+    segment_max_time_ms = {{ .Values.storage.segmentMaxTimeMs }}
+    flush_interval_ms = {{ .Values.storage.flushIntervalMs }}
+    flush_mode = {{ .Values.storage.flushMode | quote }}
+    io_engine = {{ .Values.storage.ioEngine | quote }}
+
+    [retention]
+    max_bytes = {{ .Values.retention.maxBytes }}
+    max_ms = {{ .Values.retention.maxMs }}
+    compaction_enabled = {{ .Values.retention.compactionEnabled }}
+
+    [replication]
+    default_replication_factor = {{ .Values.replication.defaultReplicationFactor }}
+    min_isr_size = {{ .Values.replication.minIsrSize }}
+    replica_lag_time_max_ms = {{ .Values.replication.replicaLagTimeMaxMs }}
+    unclean_leader_election = {{ .Values.replication.uncleanLeaderElection }}
+
+    [network]
+    max_connections = {{ .Values.network.maxConnections }}
+    max_request_size = {{ .Values.network.maxRequestSize }}
+    max_pending_bytes = {{ .Values.network.maxPendingBytes }}
+
+    [security]
+    tls_enabled = {{ .Values.security.tls.enabled }}
+    {{- if .Values.security.tls.enabled }}
+    tls_mode = {{ .Values.security.tls.mode | quote }}
+    cert_path = {{ .Values.security.tls.certPath | quote }}
+    key_path = {{ .Values.security.tls.keyPath | quote }}
+    {{- if .Values.security.tls.caPath }}
+    ca_path = {{ .Values.security.tls.caPath | quote }}
+    {{- end }}
+    {{- end }}
+    sasl_enabled = {{ .Values.security.sasl.enabled }}
+    {{- if .Values.security.sasl.enabled }}
+    sasl_mechanisms = [{{ range $i, $m := .Values.security.sasl.mechanisms }}{{ if $i }}, {{ end }}{{ $m | quote }}{{ end }}]
+    {{- end }}
+    acl_enabled = {{ .Values.security.acl.enabled }}
+
+    [controller]
+    quorum_peers = [{{ include "r-kafka.quorumPeers" . }}]
+
+    [observability]
+    metrics_enabled = {{ .Values.observability.metrics.enabled }}
+    metrics_port = {{ .Values.observability.metrics.port }}
+    tracing_enabled = {{ .Values.observability.tracing.enabled }}
+    {{- if .Values.observability.tracing.enabled }}
+    tracing_layer = {{ .Values.observability.tracing.layer | quote }}
+    {{- if .Values.observability.tracing.endpoint }}
+    tracing_endpoint = {{ .Values.observability.tracing.endpoint | quote }}
+    {{- end }}
+    {{- end }}

@@ -17,7 +17,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use rk_core::error::{RkError, Result};
+use rk_core::error::{Result, RkError};
 use rk_core::types::{BrokerId, Offset, PartitionId, TopicName};
 use tracing::{debug, info, warn};
 
@@ -404,7 +404,10 @@ impl ReplicaFetcher {
 
     /// 获取总复制字节数
     pub fn total_bytes_replicated(&self) -> i64 {
-        self.partitions.values().map(|s| s.total_bytes_replicated).sum()
+        self.partitions
+            .values()
+            .map(|s| s.total_bytes_replicated)
+            .sum()
     }
 
     /// 获取 Fetcher 摘要
@@ -497,11 +500,15 @@ mod tests {
         fetcher.add_partition(topic("test"), partition(0), broker(1), Offset(0));
 
         fetcher.pause_partition(&topic("test"), partition(0));
-        let state = fetcher.get_partition_state(&topic("test"), partition(0)).unwrap();
+        let state = fetcher
+            .get_partition_state(&topic("test"), partition(0))
+            .unwrap();
         assert!(!state.active);
 
         fetcher.resume_partition(&topic("test"), partition(0));
-        let state = fetcher.get_partition_state(&topic("test"), partition(0)).unwrap();
+        let state = fetcher
+            .get_partition_state(&topic("test"), partition(0))
+            .unwrap();
         assert!(state.active);
     }
 
@@ -546,10 +553,14 @@ mod tests {
             fetched_bytes: 6,
         };
 
-        let batches = fetcher.handle_fetch_response(&topic("test"), partition(0), &response).unwrap();
+        let batches = fetcher
+            .handle_fetch_response(&topic("test"), partition(0), &response)
+            .unwrap();
         assert_eq!(batches, 2);
 
-        let state = fetcher.get_partition_state(&topic("test"), partition(0)).unwrap();
+        let state = fetcher
+            .get_partition_state(&topic("test"), partition(0))
+            .unwrap();
         assert_eq!(state.fetch_offset, Offset(10));
         assert_eq!(state.leader_hw, Offset(10));
         assert_eq!(state.total_bytes_replicated, 6);
@@ -570,10 +581,14 @@ mod tests {
             fetched_bytes: 0,
         };
 
-        let batches = fetcher.handle_fetch_response(&topic("test"), partition(0), &response).unwrap();
+        let batches = fetcher
+            .handle_fetch_response(&topic("test"), partition(0), &response)
+            .unwrap();
         assert_eq!(batches, 0);
 
-        let state = fetcher.get_partition_state(&topic("test"), partition(0)).unwrap();
+        let state = fetcher
+            .get_partition_state(&topic("test"), partition(0))
+            .unwrap();
         assert_eq!(state.consecutive_failures, 1);
     }
 
@@ -587,7 +602,9 @@ mod tests {
             record_batches: vec![],
             fetched_bytes: 0,
         };
-        assert!(fetcher.handle_fetch_response(&topic("unknown"), partition(0), &response).is_err());
+        assert!(fetcher
+            .handle_fetch_response(&topic("unknown"), partition(0), &response)
+            .is_err());
     }
 
     #[test]
@@ -600,7 +617,10 @@ mod tests {
         fetcher.add_partition(topic("test"), partition(0), broker(1), Offset(0));
 
         // 模拟 Follower 已知 Leader 有数据 (产生 lag)
-        fetcher.get_partition_state_mut(&topic("test"), partition(0)).unwrap().leader_leo = Offset(10);
+        fetcher
+            .get_partition_state_mut(&topic("test"), partition(0))
+            .unwrap()
+            .leader_leo = Offset(10);
 
         // Leader 数据
         let mut leader_data = HashMap::new();
@@ -628,7 +648,9 @@ mod tests {
         assert_eq!(result.total_bytes, 300);
         assert_eq!(result.errors, 0);
 
-        let state = fetcher.get_partition_state(&topic("test"), partition(0)).unwrap();
+        let state = fetcher
+            .get_partition_state(&topic("test"), partition(0))
+            .unwrap();
         assert_eq!(state.fetch_offset, Offset(10));
     }
 

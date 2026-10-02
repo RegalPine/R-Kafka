@@ -2,10 +2,10 @@
 //!
 //! Controller 发送: 停止指定副本。
 
-use rk_core::error::Result;
 use crate::codec::{KafkaRequestDecoder, KafkaResponseEncoder};
-use crate::types::{KafkaReader, KafkaWriter};
 use crate::error_codes::KafkaErrorCode;
+use crate::types::{KafkaReader, KafkaWriter};
+use rk_core::error::Result;
 
 #[derive(Debug, Clone)]
 pub struct StopReplicaPartitionInfo {
@@ -32,10 +32,18 @@ impl KafkaRequestDecoder for StopReplicaRequest {
             let topic_name = reader.read_compact_string()?;
             let partition_index = reader.read_i32()?;
             let _tags = reader.read_tagged_fields()?;
-            partitions.push(StopReplicaPartitionInfo { topic_name, partition_index });
+            partitions.push(StopReplicaPartitionInfo {
+                topic_name,
+                partition_index,
+            });
         }
         let _tags = reader.read_tagged_fields()?;
-        Ok(Self { controller_id, controller_epoch, delete_partitions, partitions })
+        Ok(Self {
+            controller_id,
+            controller_epoch,
+            delete_partitions,
+            partitions,
+        })
     }
 }
 
@@ -77,10 +85,10 @@ mod tests {
     fn test_stop_replica_request_decode() {
         let mut buf = BytesMut::new();
         let mut w = KafkaWriter::new(&mut buf);
-        w.write_i32(1);    // controller_id
-        w.write_i32(3);    // controller_epoch
+        w.write_i32(1); // controller_id
+        w.write_i32(3); // controller_epoch
         w.write_bool(true); // delete_partitions
-        w.write_i32(1);    // 1 partition
+        w.write_i32(1); // 1 partition
         w.write_compact_string("topic-a");
         w.write_i32(0);
         w.write_tagged_fields(&[]);

@@ -241,7 +241,8 @@ impl MetadataRecord {
     /// 编码到 writer
     pub fn encode_to<W: Write>(&self, w: &mut W) {
         // 写入 header: record_type (i16) + version (i16)
-        w.write_all(&(self.record_type() as i16).to_be_bytes()).unwrap();
+        w.write_all(&(self.record_type() as i16).to_be_bytes())
+            .unwrap();
         w.write_all(&self.version().to_be_bytes()).unwrap();
 
         // 写入 body
@@ -372,7 +373,10 @@ impl MetadataRecord {
         let _version = read_i16(r)?;
 
         let rt = RecordType::from_i16(record_type).ok_or_else(|| {
-            io::Error::new(io::ErrorKind::InvalidData, format!("Unknown record type: {}", record_type))
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Unknown record type: {}", record_type),
+            )
         })?;
 
         match rt {
@@ -743,38 +747,30 @@ impl MetadataLog {
                     resource_name,
                     name,
                     value,
-                } => {
-                    LogEntry::SetConfig {
-                        resource_type: format!("{}", resource_type),
-                        resource_name: resource_name.clone(),
-                        key: name.clone(),
-                        value: value.clone().unwrap_or_default(),
-                    }
-                }
+                } => LogEntry::SetConfig {
+                    resource_type: format!("{}", resource_type),
+                    resource_name: resource_name.clone(),
+                    key: name.clone(),
+                    value: value.clone().unwrap_or_default(),
+                },
                 MetadataRecord::Broker {
                     broker_id,
                     host,
                     port,
                     rack,
                     ..
-                } => {
-                    LogEntry::RegisterBroker {
-                        broker_id: *broker_id,
-                        rack: rack.clone(),
-                        host: host.clone(),
-                        port: *port,
-                    }
-                }
+                } => LogEntry::RegisterBroker {
+                    broker_id: *broker_id,
+                    rack: rack.clone(),
+                    host: host.clone(),
+                    port: *port,
+                },
                 MetadataRecord::Feature {
-                    name,
-                    max_version,
-                    ..
-                } => {
-                    LogEntry::UpdateFeature {
-                        name: name.clone(),
-                        version: *max_version as u16,
-                    }
-                }
+                    name, max_version, ..
+                } => LogEntry::UpdateFeature {
+                    name: name.clone(),
+                    version: *max_version as u16,
+                },
                 MetadataRecord::PartitionChange {
                     isr,
                     leader,
@@ -790,19 +786,15 @@ impl MetadataLog {
                     }
                 }
                 // 新增类型: 在 replay 中作为独立操作处理
-                MetadataRecord::RemoveTopic { topic_id } => {
-                    LogEntry::DeleteTopic {
-                        topic_name: format!("topic-{}", topic_id),
-                    }
-                }
-                MetadataRecord::UnfenceBroker { broker_id, .. } => {
-                    LogEntry::RegisterBroker {
-                        broker_id: *broker_id,
-                        rack: None,
-                        host: String::new(),
-                        port: 0,
-                    }
-                }
+                MetadataRecord::RemoveTopic { topic_id } => LogEntry::DeleteTopic {
+                    topic_name: format!("topic-{}", topic_id),
+                },
+                MetadataRecord::UnfenceBroker { broker_id, .. } => LogEntry::RegisterBroker {
+                    broker_id: *broker_id,
+                    rack: None,
+                    host: String::new(),
+                    port: 0,
+                },
                 MetadataRecord::ProducerIds { .. } => {
                     // ProducerIds 不需要应用到状态机
                     continue;
@@ -811,14 +803,12 @@ impl MetadataLog {
                     // ACL 变更暂不通过 replay 处理
                     continue;
                 }
-                MetadataRecord::FenceBroker { broker_id, .. } => {
-                    LogEntry::RegisterBroker {
-                        broker_id: *broker_id,
-                        rack: None,
-                        host: String::new(),
-                        port: 0,
-                    }
-                }
+                MetadataRecord::FenceBroker { broker_id, .. } => LogEntry::RegisterBroker {
+                    broker_id: *broker_id,
+                    rack: None,
+                    host: String::new(),
+                    port: 0,
+                },
             };
 
             sm.apply(entry.offset, &log_entry);
@@ -1099,13 +1089,22 @@ mod tests {
             RecordType::Header
         );
         assert_eq!(
-            MetadataRecord::Topic { topic_id: 0, name: String::new() }.record_type(),
+            MetadataRecord::Topic {
+                topic_id: 0,
+                name: String::new()
+            }
+            .record_type(),
             RecordType::Topic
         );
         assert_eq!(
             MetadataRecord::Broker {
-                broker_id: 0, host: String::new(), port: 0, rack: None, broker_epoch: 0
-            }.record_type(),
+                broker_id: 0,
+                host: String::new(),
+                port: 0,
+                rack: None,
+                broker_epoch: 0
+            }
+            .record_type(),
             RecordType::Broker
         );
     }
@@ -1113,7 +1112,14 @@ mod tests {
     #[test]
     fn test_record_version() {
         assert_eq!(MetadataRecord::Header { version: 0 }.version(), 0);
-        assert_eq!(MetadataRecord::Topic { topic_id: 0, name: String::new() }.version(), 0);
+        assert_eq!(
+            MetadataRecord::Topic {
+                topic_id: 0,
+                name: String::new()
+            }
+            .version(),
+            0
+        );
     }
 
     #[test]

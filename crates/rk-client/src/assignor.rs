@@ -90,10 +90,7 @@ impl PartitionAssignor for RangeAssignor {
         // 按 Topic 分组 partitions
         let mut topic_partitions: HashMap<&str, Vec<&TopicPartition>> = HashMap::new();
         for tp in partitions {
-            topic_partitions
-                .entry(&tp.topic)
-                .or_default()
-                .push(tp);
+            topic_partitions.entry(&tp.topic).or_default().push(tp);
         }
 
         // 对每个 Topic 的 partitions 排序
@@ -176,9 +173,7 @@ impl PartitionAssignor for RoundRobinAssignor {
 
         // 排序全部 partitions (topic 字典序, partition 升序)
         let mut sorted_partitions = partitions.to_vec();
-        sorted_partitions.sort_by(|a, b| {
-            a.topic.cmp(&b.topic).then(a.partition.cmp(&b.partition))
-        });
+        sorted_partitions.sort_by(|a, b| a.topic.cmp(&b.topic).then(a.partition.cmp(&b.partition)));
 
         // 轮询分配: 跳过不订阅该 partition 所在 topic 的成员
         let mut member_idx = 0;
@@ -315,10 +310,7 @@ impl CooperativeStickyAssignor {
                 .map(|mid| mid.to_string());
 
             if let Some(member_id) = best_member {
-                result
-                    .entry(member_id)
-                    .or_default()
-                    .push(tp);
+                result.entry(member_id).or_default().push(tp);
             }
         }
 
@@ -357,9 +349,7 @@ pub fn get_assignor(name: &str) -> Option<Box<dyn PartitionAssignor>> {
 ///
 /// 与 Kafka GroupCoordinator 的选择逻辑一致:
 /// 找到所有成员都支持的第一个协议 (按第一个成员上报的顺序)。
-pub fn select_protocol(
-    members_protocols: &[Vec<String>],
-) -> Option<String> {
+pub fn select_protocol(members_protocols: &[Vec<String>]) -> Option<String> {
     if members_protocols.is_empty() {
         return None;
     }
@@ -394,9 +384,7 @@ mod tests {
     }
 
     fn make_partitions(topic: &str, count: i32) -> Vec<TopicPartition> {
-        (0..count)
-            .map(|p| TopicPartition::new(topic, p))
-            .collect()
+        (0..count).map(|p| TopicPartition::new(topic, p)).collect()
     }
 
     // ─── RangeAssignor 测试 ──────────────────────────────────────
@@ -404,10 +392,7 @@ mod tests {
     #[test]
     fn test_range_single_topic_even() {
         let assignor = RangeAssignor;
-        let members = make_members(
-            &["m1", "m2"],
-            &[vec!["t1"], vec!["t1"]],
-        );
+        let members = make_members(&["m1", "m2"], &[vec!["t1"], vec!["t1"]]);
         let partitions = make_partitions("t1", 4);
         let result = assignor.assign(&members, &partitions);
 
@@ -424,10 +409,7 @@ mod tests {
     #[test]
     fn test_range_single_topic_uneven() {
         let assignor = RangeAssignor;
-        let members = make_members(
-            &["m1", "m2", "m3"],
-            &[vec!["t1"], vec!["t1"], vec!["t1"]],
-        );
+        let members = make_members(&["m1", "m2", "m3"], &[vec!["t1"], vec!["t1"], vec!["t1"]]);
         let partitions = make_partitions("t1", 5);
         let result = assignor.assign(&members, &partitions);
 
@@ -440,10 +422,7 @@ mod tests {
     #[test]
     fn test_range_multiple_topics() {
         let assignor = RangeAssignor;
-        let members = make_members(
-            &["m1", "m2"],
-            &[vec!["t1", "t2"], vec!["t1", "t2"]],
-        );
+        let members = make_members(&["m1", "m2"], &[vec!["t1", "t2"], vec!["t1", "t2"]]);
         let mut partitions = make_partitions("t1", 3);
         partitions.extend(make_partitions("t2", 3));
         let result = assignor.assign(&members, &partitions);
@@ -458,10 +437,7 @@ mod tests {
     #[test]
     fn test_roundrobin_even() {
         let assignor = RoundRobinAssignor;
-        let members = make_members(
-            &["m1", "m2"],
-            &[vec!["t1"], vec!["t1"]],
-        );
+        let members = make_members(&["m1", "m2"], &[vec!["t1"], vec!["t1"]]);
         let partitions = make_partitions("t1", 4);
         let result = assignor.assign(&members, &partitions);
 
@@ -472,10 +448,7 @@ mod tests {
     #[test]
     fn test_roundrobin_uneven() {
         let assignor = RoundRobinAssignor;
-        let members = make_members(
-            &["m1", "m2", "m3"],
-            &[vec!["t1"], vec!["t1"], vec!["t1"]],
-        );
+        let members = make_members(&["m1", "m2", "m3"], &[vec!["t1"], vec!["t1"], vec!["t1"]]);
         let partitions = make_partitions("t1", 7);
         let result = assignor.assign(&members, &partitions);
 
@@ -490,10 +463,7 @@ mod tests {
     #[test]
     fn test_sticky_initial_assignment() {
         let assignor = CooperativeStickyAssignor;
-        let members = make_members(
-            &["m1", "m2"],
-            &[vec!["t1"], vec!["t1"]],
-        );
+        let members = make_members(&["m1", "m2"], &[vec!["t1"], vec!["t1"]]);
         let partitions = make_partitions("t1", 4);
         let result = assignor.assign(&members, &partitions);
 
@@ -505,22 +475,19 @@ mod tests {
     #[test]
     fn test_sticky_preserves_assignment() {
         let assignor = CooperativeStickyAssignor;
-        let members = make_members(
-            &["m1", "m2"],
-            &[vec!["t1"], vec!["t1"]],
-        );
+        let members = make_members(&["m1", "m2"], &[vec!["t1"], vec!["t1"]]);
         let partitions = make_partitions("t1", 4);
 
         // 模拟上一轮分配: m1 有 [0,1], m2 有 [2,3]
         let mut current = HashMap::new();
-        current.insert("m1".to_string(), vec![
-            TopicPartition::new("t1", 0),
-            TopicPartition::new("t1", 1),
-        ]);
-        current.insert("m2".to_string(), vec![
-            TopicPartition::new("t1", 2),
-            TopicPartition::new("t1", 3),
-        ]);
+        current.insert(
+            "m1".to_string(),
+            vec![TopicPartition::new("t1", 0), TopicPartition::new("t1", 1)],
+        );
+        current.insert(
+            "m2".to_string(),
+            vec![TopicPartition::new("t1", 2), TopicPartition::new("t1", 3)],
+        );
 
         let result = assignor.assign_with_current(&members, &partitions, &current);
 
@@ -541,14 +508,14 @@ mod tests {
         let partitions = make_partitions("t1", 4);
 
         let mut current = HashMap::new();
-        current.insert("m1".to_string(), vec![
-            TopicPartition::new("t1", 0),
-            TopicPartition::new("t1", 1),
-        ]);
-        current.insert("m2".to_string(), vec![
-            TopicPartition::new("t1", 2),
-            TopicPartition::new("t1", 3),
-        ]);
+        current.insert(
+            "m1".to_string(),
+            vec![TopicPartition::new("t1", 0), TopicPartition::new("t1", 1)],
+        );
+        current.insert(
+            "m2".to_string(),
+            vec![TopicPartition::new("t1", 2), TopicPartition::new("t1", 3)],
+        );
 
         let result = assignor.assign_with_current(&members, &partitions, &current);
 
@@ -571,10 +538,7 @@ mod tests {
 
     #[test]
     fn test_select_protocol_no_common() {
-        let protocols = vec![
-            vec!["range".to_string()],
-            vec!["roundrobin".to_string()],
-        ];
+        let protocols = vec![vec!["range".to_string()], vec!["roundrobin".to_string()]];
         // 没有共同协议
         assert_eq!(select_protocol(&protocols), None);
     }
