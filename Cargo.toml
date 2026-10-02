@@ -1,0 +1,76 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rk-core",
+    "crates/rk-protocol",
+    "crates/rk-network",
+    "crates/rk-storage",
+    "crates/rk-broker",
+    "crates/rk-replication",
+    "crates/rk-controller",
+    "crates/rk-server",
+    "crates/rk-client",
+    "crates/rk-security",
+    "crates/rk-observability",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "Apache-2.0"
+repository = "https://github.com/RegalPine/R-Kafka"
+documentation = "https://docs.rs/r-kafka"
+homepage = "https://github.com/RegalPine/R-Kafka"
+description = "A high-performance, Kafka-compatible message streaming platform written in Rust"
+keywords = ["kafka", "streaming", "messaging", "event-sourcing", "distributed-systems"]
+categories = ["asynchronous", "database", "network-programming"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+# Zero-copy bytes buffer
+bytes = "1"
+# Async codec utilities
+tokio-util = { version = "0.7", features = ["codec"] }
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Error handling
+thiserror = "2"
+anyhow = "1"
+# Logging / tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+# CLI
+clap = { version = "4", features = ["derive"] }
+# Config
+toml = "0.8"
+# CRC32C
+crc32c = "0.6"
+# Concurrent hashmap
+dashmap = "6"
+# Cross-thread channel
+flume = "0.11"
+# Memory-mapped files
+memmap2 = "0.9"
+# System call interface (zero-copy splice/sendfile)
+libc = "0.2"
+# Consensus protocol (KRaft)
+openraft = { version = "0.9", features = ["serde"] }
+# Internal crate dependencies
+rk-core = { path = "crates/rk-core" }
+rk-protocol = { path = "crates/rk-protocol" }
+rk-network = { path = "crates/rk-network" }
+rk-storage = { path = "crates/rk-storage" }
+rk-broker = { path = "crates/rk-broker" }
+rk-replication = { path = "crates/rk-replication" }
+rk-controller = { path = "crates/rk-controller" }
+rk-security = { path = "crates/rk-security" }
+rk-observability = { path = "crates/rk-observability" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true

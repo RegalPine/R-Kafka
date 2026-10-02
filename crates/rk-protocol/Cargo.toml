@@ -1,0 +1,17 @@
+[package]
+name = "rk-protocol"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rk-core = { workspace = true }
+bytes = { workspace = true }
+tokio-util = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+crc32c = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+rand = "0.8"

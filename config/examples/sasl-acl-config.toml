@@ -1,0 +1,64 @@
+# R-Kafka SASL 认证 + ACL 授权配置
+# 支持 PLAIN / SCRAM-SHA-256 / SCRAM-SHA-512
+
+[broker]
+id = 1
+host = "0.0.0.0"
+port = 9092
+
+[storage]
+data_dir = "/var/lib/r-kafka/data"
+segment_max_size = 1073741824
+flush_mode = "hybrid"
+
+[retention]
+max_bytes = 1099511627776
+max_ms = 604800000
+compaction_enabled = true
+
+[replication]
+default_replication_factor = 3
+min_isr_size = 2
+
+[network]
+max_connections = 100000
+max_request_size = 104857600
+
+[security]
+tls_enabled = false
+sasl_enabled = true
+sasl_mechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-512"]
+
+# 超级用户 (旁路 ACL 检查)
+super_users = ["User:admin"]
+
+# ACL 授权
+acl_enabled = true
+
+# ═══ ACL 规则示例 ═══
+# 通过 API 或启动时加载:
+#
+# Allow alice 读写 topic-orders
+# ALLOW principal=User:alice operation=READ resource=Topic:topic-orders
+# ALLOW principal=User:alice operation=WRITE resource=Topic:topic-orders
+#
+# Allow consumer-group 给 bob
+# ALLOW principal=User:bob operation=READ resource=Group:orders-group
+#
+# Deny all from 192.168.1.100
+# DENY principal=User:* host=192.168.1.100 operation=ALL resource=Topic:*
+
+[controller]
+quorum_peers = [
+    "1@broker1.internal:9093",
+    "2@broker2.internal:9093",
+    "3@broker3.internal:9093",
+]
+election_timeout_ms = 3000
+
+[observability]
+metrics_enabled = true
+metrics_port = 9090
+tracing_enabled = true
+tracing_layer = "json"
+tracing_endpoint = "http://otel-collector:4317"  # OpenTelemetry

@@ -1,0 +1,76 @@
+# R-Kafka 生产环境推荐配置
+# 高性能 + 高可用 + 安全
+
+[broker]
+id = 1
+host = "0.0.0.0"
+port = 9092
+rack = "rack-a"                     # 机架感知
+
+[storage]
+data_dir = "/data/r-kafka"
+segment_max_size = 1073741824       # 1GB
+segment_max_time_ms = 1800000       # 30min
+flush_interval_ms = 3               # 低延迟刷盘
+flush_mode = "hybrid"               # 混合刷盘 (async + sync)
+# io_engine = "io_uring"            # Linux: io_uring Direct I/O
+
+[retention]
+max_bytes = 1099511627776           # 1TB
+max_ms = 604800000                  # 7 days
+compaction_enabled = true           # 启用 Log Compaction
+cleanup_policy = "compact,delete"   # compact + delete 结合
+
+[replication]
+default_replication_factor = 3      # 3 副本
+min_isr_size = 2                    # 至少 2 个 ISR
+replica_lag_time_max_ms = 10000     # 10s lag 容忍
+unclean_leader_election = false     # 禁止非 ISR 选举
+
+[network]
+max_connections = 100000
+max_request_size = 104857600        # 100MB
+max_pending_bytes = 536870912       # 512MB
+
+[security]
+tls_enabled = true
+tls_mode = "mutual"                 # mTLS
+cert_path = "/etc/r-kafka/tls/server.crt"
+key_path = "/etc/r-kafka/tls/server.key"
+ca_path = "/etc/r-kafka/tls/ca.crt"
+
+sasl_enabled = true
+sasl_mechanisms = ["SCRAM-SHA-512"]
+acl_enabled = true
+super_users = ["User:admin"]
+
+[controller]
+quorum_peers = [
+    "1@broker1.internal:9093",
+    "2@broker2.internal:9093",
+    "3@broker3.internal:9093",
+]
+election_timeout_ms = 3000
+
+[observability]
+metrics_enabled = true
+metrics_port = 9090
+tracing_enabled = true
+tracing_layer = "json"
+tracing_endpoint = "http://otel-collector:4317"
+service_name = "r-kafka-broker"
+
+# ═══════════════════════════════════════════════════════════════
+# 生产环境 JVM 参数等效项 (Rust 无需 JVM, 但以下系统调优等效):
+# ═══════════════════════════════════════════════════════════════
+#
+# -Xmx6g -Xms6g           → 无需 (Rust 无 GC)
+# -XX:+UseG1GC             → 无需 (Rust 无 GC)
+# -Djava.net.preferIPv4    → 无需 (Rust 默认 IPv4)
+#
+# Linux 系统调优 (等效 JVM 参数):
+# echo 65535 > /proc/sys/net/core/somaxconn     # 最大监听队列
+# echo 32768 > /proc/sys/net/core/netdev_max_backlog  # 网络设备 backlog
+# sysctl -w vm.swappiness=1                      # 最小 swap 使用
+# sysctl -w net.ipv4.tcp_max_syn_backlog=65535  # SYN 队列
+# ulimit -n 100000                               # 文件描述符限制

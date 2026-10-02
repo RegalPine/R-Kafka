@@ -1,0 +1,49 @@
+# R-Kafka 默认配置文件
+# 参考: Apache Kafka 配置命名风格
+
+[broker]
+id = 1
+host = "0.0.0.0"
+port = 9092
+# rack = "rack-1"  # Rack Awareness (Phase 3)
+
+[storage]
+data_dir = "/data/r-kafka"
+segment_max_size = 1073741824       # 1GB
+segment_max_time_ms = 1800000       # 30min
+flush_interval_ms = 5
+flush_mode = "hybrid"               # async | sync | hybrid
+
+[retention]
+max_bytes = 1099511627776           # 1TB
+max_ms = 604800000                  # 7 days
+compaction_enabled = false
+
+[replication]
+default_replication_factor = 1      # Phase 1: 单副本
+min_isr_size = 1                    # Phase 1: 单副本
+replica_lag_time_max_ms = 10000
+unclean_leader_election = false
+
+[network]
+max_connections = 100000
+max_request_size = 104857600        # 100MB
+max_pending_bytes = 536870912       # 512MB
+
+[security]
+tls_enabled = false
+tls_mode = "one-way"                # one-way | mutual
+# cert_path = "/path/to/cert.pem"
+# key_path = "/path/to/key.pem"
+# ca_path = "/path/to/ca.pem"
+sasl_enabled = false
+# sasl_mechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-512"]
+
+[controller]
+# quorum_peers = ["1@localhost:9093"]  # Phase 3: KRaft 集群
+election_timeout_ms = 3000
+
+[observability]
+metrics_enabled = false
+metrics_port = 9090
+tracing_enabled = false

@@ -1,0 +1,57 @@
+# R-Kafka TLS 加密通信配置
+# 支持 one-way TLS 和 mutual TLS (mTLS)
+
+[broker]
+id = 1
+host = "0.0.0.0"
+port = 9093                         # TLS 通常使用 9093 端口
+
+[storage]
+data_dir = "/var/lib/r-kafka/data"
+segment_max_size = 1073741824
+flush_mode = "hybrid"
+
+[retention]
+max_bytes = 1099511627776
+max_ms = 604800000
+
+[replication]
+default_replication_factor = 3
+min_isr_size = 2
+
+[network]
+max_connections = 100000
+max_request_size = 104857600
+
+[security]
+# ═══ TLS 配置 ═══
+tls_enabled = true
+tls_mode = "mutual"                 # one-way | mutual
+
+# 服务器证书和私钥
+cert_path = "/etc/r-kafka/tls/server.crt"
+key_path = "/etc/r-kafka/tls/server.key"
+
+# CA 证书 (mTLS 必需, one-way TLS 可选)
+ca_path = "/etc/r-kafka/tls/ca.crt"
+
+# ═══ SASL 配置 (可选, 与 TLS 组合使用) ═══
+sasl_enabled = true
+sasl_mechanisms = ["SCRAM-SHA-256", "SCRAM-SHA-512"]
+
+# ACL 配置
+acl_enabled = true
+
+[controller]
+quorum_peers = [
+    "1@broker1.internal:9094",
+    "2@broker2.internal:9094",
+    "3@broker3.internal:9094",
+]
+election_timeout_ms = 3000
+
+[observability]
+metrics_enabled = true
+metrics_port = 9090
+tracing_enabled = true
+tracing_layer = "json"

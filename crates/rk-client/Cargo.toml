@@ -1,0 +1,13 @@
+[package]
+name = "rk-client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rk-core = { workspace = true }
+rk-protocol = { workspace = true }
+tokio = { workspace = true }
+bytes = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+dashmap = { workspace = true }
