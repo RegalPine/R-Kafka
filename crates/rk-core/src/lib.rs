@@ -4,9 +4,13 @@
 
 pub mod config;
 pub mod error;
+pub mod handler;
+pub mod metrics;
 pub mod types;
 
 pub use config::BrokerConfig;
 pub use config::SaslUserConfig;
 pub use error::{Result, RkError};
+pub use handler::RequestHandler;
+pub use metrics::{MetricsProvider, MetricsSnapshot};
 pub use types::*;

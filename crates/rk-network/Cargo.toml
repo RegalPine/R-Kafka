@@ -6,7 +6,6 @@ edition.workspace = true
 [dependencies]
 rk-core = { workspace = true }
 rk-protocol = { workspace = true }
-rk-broker = { workspace = true }
 rk-security = { workspace = true }
 tokio = { workspace = true }
 bytes = { workspace = true }

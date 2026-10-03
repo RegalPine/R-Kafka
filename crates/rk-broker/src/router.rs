@@ -901,7 +901,18 @@ impl BrokerRouter {
     }
 }
 
-#[cfg(test)]
+/// 为 BrokerRouter 实现 rk-core 中的 RequestHandler trait
+///
+/// 使网络层可通过 trait 对象调用 BrokerRouter，无需依赖 rk-broker crate。
+impl rk_core::RequestHandler for BrokerRouter {
+    fn handle_frame(&self, frame: &[u8]) -> rk_core::error::Result<Vec<u8>> {
+        self.handle_frame(frame)
+    }
+
+    fn is_sasl_enabled(&self) -> bool {
+        self.is_sasl_enabled()
+    }
+}#[cfg(test)]
 mod tests {
     use super::*;
     use rk_protocol::apis::offset_commit::*;

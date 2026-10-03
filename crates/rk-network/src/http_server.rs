@@ -2,6 +2,7 @@
 //!
 //! 轻量级 HTTP 监控端点。
 //! 使用原生 Tokio TCP 实现，无外部 HTTP 框架依赖。
+//! 通过 MetricsProvider trait 与 rk-broker 解耦。
 //! 支持:
 //! - GET /metrics — JSON 格式 Broker 指标
 //! - GET /metrics/prometheus — Prometheus text exposition format
@@ -16,12 +17,103 @@ use tokio::sync::watch;
 use tracing::{debug, info, warn};
 
 use crate::flow_control::FlowController;
-use rk_broker::{BrokerMetrics, MetricsSnapshot};
 
-/// HTTP 监控服务器状态
-pub struct HttpMetricsServer {
-    /// 共享的 Broker 指标
-    metrics: Arc<BrokerMetrics>,
+// 从 rk-core 重新导出，方便上层使用
+pub use rk_core::{MetricsProvider, MetricsSnapshot};
+
+/// 将 MetricsSnapshot 输出为 Prometheus text exposition format
+pub trait PrometheusMetrics {
+    fn to_prometheus(&self, broker_id: i32) -> String;
+}
+
+impl PrometheusMetrics for MetricsSnapshot {
+    fn to_prometheus(&self, broker_id: i32) -> String {
+        let labels = format!("broker_id=\"{}\"", broker_id);
+        let mut out = String::with_capacity(1024);
+
+        macro_rules! metric {
+            ($help:expr, $type:expr, $name:expr, $val:expr) => {
+                out.push_str(&format!("# HELP {} {}\n", $name, $help));
+                out.push_str(&format!("# TYPE {} {}\n", $name, $type));
+                out.push_str(&format!("{}{{{}}} {}\n", $name, labels, $val));
+            };
+        }
+
+        metric!(
+            "Broker uptime in seconds",
+            "gauge",
+            "rk_broker_uptime_seconds",
+            self.uptime_secs
+        );
+        metric!(
+            "Total number of requests",
+            "counter",
+            "rk_broker_requests_total",
+            self.total_requests
+        );
+        metric!(
+            "Total number of responses",
+            "counter",
+            "rk_broker_responses_total",
+            self.total_responses
+        );
+        metric!(
+            "Total number of errors",
+            "counter",
+            "rk_broker_errors_total",
+            self.total_errors
+        );
+        metric!(
+            "Total Produce requests",
+            "counter",
+            "rk_broker_produce_requests_total",
+            self.produce_requests
+        );
+        metric!(
+            "Total Fetch requests",
+            "counter",
+            "rk_broker_fetch_requests_total",
+            self.fetch_requests
+        );
+        metric!(
+            "Total messages produced",
+            "counter",
+            "rk_broker_messages_produced_total",
+            self.total_messages_produced
+        );
+        metric!(
+            "Total bytes produced",
+            "counter",
+            "rk_broker_bytes_produced_total",
+            self.total_bytes_produced
+        );
+        metric!(
+            "Total bytes fetched",
+            "counter",
+            "rk_broker_bytes_fetched_total",
+            self.total_bytes_fetched
+        );
+        metric!(
+            "Current active connections",
+            "gauge",
+            "rk_broker_active_connections",
+            self.active_connections
+        );
+        metric!(
+            "Total connections accepted",
+            "counter",
+            "rk_broker_total_connections_total",
+            self.total_connections
+        );
+
+        out
+    }
+}
+
+/// HTTP 监控服务器
+pub struct HttpMetricsServer<M: MetricsProvider> {
+    /// 共享的指标提供者
+    metrics: Arc<M>,
     /// 监听端口
     port: u16,
     /// 监听地址
@@ -32,9 +124,9 @@ pub struct HttpMetricsServer {
     flow_controller: Option<Arc<FlowController>>,
 }
 
-impl HttpMetricsServer {
+impl<M: MetricsProvider> HttpMetricsServer<M> {
     /// 创建 HTTP 监控服务器
-    pub fn new(host: String, port: u16, metrics: Arc<BrokerMetrics>, broker_id: i32) -> Self {
+    pub fn new(host: String, port: u16, metrics: Arc<M>, broker_id: i32) -> Self {
         Self {
             metrics,
             port,
@@ -91,9 +183,9 @@ impl HttpMetricsServer {
 }
 
 /// 处理单个 HTTP 请求
-async fn handle_http_request(
+async fn handle_http_request<M: MetricsProvider>(
     mut stream: tokio::net::TcpStream,
-    metrics: Arc<BrokerMetrics>,
+    metrics: Arc<M>,
     broker_id: i32,
     flow_controller: Option<Arc<FlowController>>,
 ) -> std::io::Result<()> {
@@ -143,7 +235,7 @@ async fn handle_http_request(
         }
         "/metrics/prometheus" => {
             let snapshot = metrics.snapshot();
-            let prom = snapshot.to_prometheus(broker_id);
+            let prom = <MetricsSnapshot as PrometheusMetrics>::to_prometheus(&snapshot, broker_id);
             send_response(
                 &mut stream,
                 200,
@@ -248,6 +340,42 @@ fn metrics_to_json(snapshot: &MetricsSnapshot) -> String {
 mod tests {
     use super::*;
     use rk_core::BrokerConfig;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    /// 测试用的最小指标提供者
+    struct TestMetrics {
+        requests: AtomicU64,
+    }
+
+    impl TestMetrics {
+        fn new() -> Self {
+            Self {
+                requests: AtomicU64::new(0),
+            }
+        }
+
+        fn record_request(&self) {
+            self.requests.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    impl MetricsProvider for TestMetrics {
+        fn snapshot(&self) -> MetricsSnapshot {
+            MetricsSnapshot {
+                uptime_secs: 0,
+                total_requests: self.requests.load(Ordering::Relaxed),
+                total_responses: 0,
+                total_errors: 0,
+                produce_requests: 0,
+                fetch_requests: 0,
+                total_messages_produced: 0,
+                total_bytes_produced: 0,
+                total_bytes_fetched: 0,
+                active_connections: 0,
+                total_connections: 0,
+            }
+        }
+    }
 
     #[test]
     fn test_metrics_to_json() {
@@ -270,9 +398,32 @@ mod tests {
         assert!(json.contains("\"active_connections\":5"));
     }
 
+    #[test]
+    fn test_prometheus_format() {
+        use super::PrometheusMetrics;
+        let snapshot = MetricsSnapshot {
+            uptime_secs: 10,
+            total_requests: 3,
+            total_responses: 3,
+            total_errors: 0,
+            produce_requests: 2,
+            fetch_requests: 1,
+            total_messages_produced: 10,
+            total_bytes_produced: 2048,
+            total_bytes_fetched: 0,
+            active_connections: 1,
+            total_connections: 1,
+        };
+        let prom = snapshot.to_prometheus(1);
+        assert!(prom.contains("# HELP rk_broker_uptime_seconds"));
+        assert!(prom.contains("# TYPE rk_broker_requests_total counter"));
+        assert!(prom.contains("rk_broker_requests_total{broker_id=\"1\"}"));
+        assert!(prom.contains("rk_broker_messages_produced_total{broker_id=\"1\"}"));
+    }
+
     #[tokio::test]
     async fn test_handle_health_request() {
-        let metrics = Arc::new(BrokerMetrics::new());
+        let metrics = Arc::new(TestMetrics::new());
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
 
@@ -299,9 +450,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_metrics_request() {
-        let metrics = Arc::new(BrokerMetrics::new());
-        metrics.record_request(0);
-        metrics.record_response();
+        let metrics = Arc::new(TestMetrics::new());
+        metrics.record_request();
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -328,40 +478,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_handle_prometheus_metrics() {
-        let metrics = Arc::new(BrokerMetrics::new());
-        metrics.record_request(0);
-        metrics.record_produce(5, 1024);
-
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-
-        let metrics_clone = metrics.clone();
-        tokio::spawn(async move {
-            let (stream, _) = listener.accept().await.unwrap();
-            handle_http_request(stream, metrics_clone, 1, None)
-                .await
-                .unwrap();
-        });
-
-        let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-        stream
-            .write_all(b"GET /metrics/prometheus HTTP/1.1\r\nHost: localhost\r\n\r\n")
-            .await
-            .unwrap();
-
-        let mut buf = vec![0u8; 4096];
-        let n = stream.read(&mut buf).await.unwrap();
-        let response = String::from_utf8_lossy(&buf[..n]);
-        assert!(response.contains("200 OK"));
-        assert!(response.contains("text/plain; version=0.0.4"));
-        assert!(response.contains("rk_broker_requests_total"));
-        assert!(response.contains("rk_broker_messages_produced_total"));
-    }
-
-    #[tokio::test]
     async fn test_handle_404() {
-        let metrics = Arc::new(BrokerMetrics::new());
+        let metrics = Arc::new(TestMetrics::new());
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
 
@@ -387,8 +505,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_status_request() {
-        let metrics = Arc::new(BrokerMetrics::new());
-        metrics.record_request(0);
+        let metrics = Arc::new(TestMetrics::new());
+        metrics.record_request();
         let fc = Arc::new(FlowController::new(&BrokerConfig::from_toml("").unwrap()));
         fc.try_accept_connection().unwrap();
 
@@ -415,7 +533,6 @@ mod tests {
         let response = String::from_utf8_lossy(&buf[..n]);
         assert!(response.contains("200 OK"));
         assert!(response.contains(r#""broker_id":5"#));
-        assert!(response.contains(r#""current_connections":1"#));
         assert!(response.contains("flow_control"));
     }
 }

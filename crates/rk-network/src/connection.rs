@@ -1,7 +1,7 @@
 //! 连接管理
 //!
 //! 每个 TCP 连接的生命周期管理：帧解码、SASL 状态机、会话跟踪、读写缓冲。
-//! 集成 BrokerRouter 完成请求处理。
+//! 通过 RequestHandler trait 与业务层解耦，支持替换不同的处理器实现。
 //! 支持纯 TCP 和 TLS 两种传输方式。
 
 use bytes::{Buf, BytesMut};
@@ -11,9 +11,10 @@ use tokio::net::TcpStream;
 use tokio_rustls::server::TlsStream;
 use tracing::{debug, error, warn};
 
-use rk_broker::connection_session::ConnectionSession;
-use rk_broker::BrokerRouter;
 use rk_core::error::Result;
+
+use crate::handler::{extract_api_key, is_pre_auth_api, RequestHandler};
+use crate::session::ConnectionSession;
 
 /// 连接状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -178,9 +179,9 @@ impl Connection {
 
 /// 处理单个 TCP 连接的完整生命周期
 ///
-/// 循环读取请求帧 → SASL 状态机检查 → BrokerRouter 处理 → 写入响应帧，
+/// 循环读取请求帧 → SASL 状态机检查 → RequestHandler 处理 → 写入响应帧，
 /// 直到连接关闭或出错。
-pub async fn handle_connection(stream: TcpStream, router: Arc<BrokerRouter>) {
+pub async fn handle_connection<H: RequestHandler>(stream: TcpStream, handler: Arc<H>) {
     let peer = stream.peer_addr().ok();
     let peer_str = peer
         .map(|a| a.to_string())
@@ -188,29 +189,29 @@ pub async fn handle_connection(stream: TcpStream, router: Arc<BrokerRouter>) {
     debug!(peer = %peer_str, "New client connection");
 
     let conn = Connection::new(stream);
-    handle_connection_inner(conn, peer_str, router).await;
+    handle_connection_inner(conn, peer_str, handler).await;
 }
 
 /// 处理单个 TLS 连接的完整生命周期
-pub async fn handle_tls_connection(
+pub async fn handle_tls_connection<H: RequestHandler>(
     stream: TlsStream<TcpStream>,
     peer_addr: std::net::SocketAddr,
-    router: Arc<BrokerRouter>,
+    handler: Arc<H>,
 ) {
     let peer_str = peer_addr.to_string();
     debug!(peer = %peer_str, "New TLS client connection");
 
     let conn = Connection::new_tls(stream, peer_addr);
-    handle_connection_inner(conn, peer_str, router).await;
+    handle_connection_inner(conn, peer_str, handler).await;
 }
 
 /// 连接处理核心逻辑 (TCP/TLS 共用)
-async fn handle_connection_inner(
+async fn handle_connection_inner<H: RequestHandler>(
     mut conn: Connection,
     peer_str: String,
-    router: Arc<BrokerRouter>,
+    handler: Arc<H>,
 ) {
-    let sasl_enabled = router.is_sasl_enabled();
+    let sasl_enabled = handler.is_sasl_enabled();
 
     loop {
         // 读取下一帧
@@ -230,7 +231,7 @@ async fn handle_connection_inner(
         conn.session.increment_request_count();
 
         // 提取 api_key
-        let api_key = match BrokerRouter::extract_api_key(&frame) {
+        let api_key = match extract_api_key(&frame) {
             Some(key) => key,
             None => {
                 warn!(peer = %peer_str, "Frame too short to extract api_key");
@@ -241,7 +242,7 @@ async fn handle_connection_inner(
         // SASL 状态机: 认证前检查
         if sasl_enabled
             && !conn.session.is_authenticated()
-            && !BrokerRouter::is_pre_auth_api(api_key)
+            && !is_pre_auth_api(api_key)
         {
             warn!(
                 peer = %peer_str,
@@ -251,8 +252,8 @@ async fn handle_connection_inner(
             break;
         }
 
-        // 通过 BrokerRouter 处理请求
-        match router.handle_frame(&frame) {
+        // 通过 RequestHandler 处理请求
+        match handler.handle_frame(&frame) {
             Ok(response) => {
                 // SASL 状态转换: 在成功处理后更新 session 状态
                 if sasl_enabled && !conn.session.is_authenticated() {

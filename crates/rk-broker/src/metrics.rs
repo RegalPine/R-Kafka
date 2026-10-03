@@ -123,6 +123,28 @@ impl Default for BrokerMetrics {
     }
 }
 
+/// 为 BrokerMetrics 实现 rk-core 的 MetricsProvider trait
+///
+/// 使网络层（rk-network）可通过 trait 接口获取指标，无需直接依赖 rk-broker。
+impl rk_core::MetricsProvider for BrokerMetrics {
+    fn snapshot(&self) -> rk_core::MetricsSnapshot {
+        let s = self.snapshot();
+        rk_core::MetricsSnapshot {
+            uptime_secs: s.uptime_secs,
+            total_requests: s.total_requests,
+            total_responses: s.total_responses,
+            total_errors: s.total_errors,
+            produce_requests: s.produce_requests,
+            fetch_requests: s.fetch_requests,
+            total_messages_produced: s.total_messages_produced,
+            total_bytes_produced: s.total_bytes_produced,
+            total_bytes_fetched: s.total_bytes_fetched,
+            active_connections: s.active_connections,
+            total_connections: s.total_connections,
+        }
+    }
+}
+
 /// 指标快照 (只读)
 #[derive(Debug, Clone)]
 pub struct MetricsSnapshot {

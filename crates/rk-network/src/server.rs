@@ -3,6 +3,7 @@
 //! 基于 Tokio 的 TCP 监听，支持连接管理和请求路由。
 //! 支持纯 TCP 和 TLS 两种传输方式。
 //! 支持优雅关闭 (Graceful Shutdown)。
+//! 通过 RequestHandler trait 与业务层解耦。
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -11,11 +12,11 @@ use tokio::sync::watch;
 use tokio_rustls::TlsAcceptor;
 use tracing::{error, info, warn};
 
-use rk_broker::BrokerRouter;
 use rk_core::BrokerConfig;
 
 use crate::connection::{handle_connection, handle_tls_connection};
 use crate::flow_control::FlowController;
+use crate::handler::RequestHandler;
 
 /// 启动 TCP 监听
 ///
@@ -71,7 +72,10 @@ pub async fn start_listener(config: &BrokerConfig) -> rk_core::Result<TcpListene
 ///
 /// 接受 TCP 连接并为每个连接 spawn 一个异步任务。
 /// 支持通过 shutdown_rx 信号优雅关闭。
-pub async fn run_server(config: &BrokerConfig, router: Arc<BrokerRouter>) -> rk_core::Result<()> {
+pub async fn run_server<H: RequestHandler>(
+    config: &BrokerConfig,
+    handler: Arc<H>,
+) -> rk_core::Result<()> {
     let listener = start_listener(config).await?;
     let flow_controller = Arc::new(FlowController::new(config));
 
@@ -79,16 +83,16 @@ pub async fn run_server(config: &BrokerConfig, router: Arc<BrokerRouter>) -> rk_
 
     // 无关闭信号的兼容模式 (向后兼容)
     let (_tx, rx) = watch::channel(false);
-    run_server_with_shutdown(listener, router, flow_controller, None, rx).await
+    run_server_with_shutdown(listener, handler, flow_controller, None, rx).await
 }
 
 /// 运行 Broker 服务 (带优雅关闭)
 ///
 /// 收到关闭信号后停止接受新连接，等待现有连接处理完成。
 /// 当 `tls_acceptor` 不为 None 时，所有连接先进行 TLS 握手再处理。
-pub async fn run_server_with_shutdown(
+pub async fn run_server_with_shutdown<H: RequestHandler>(
     listener: TcpListener,
-    router: Arc<BrokerRouter>,
+    handler: Arc<H>,
     flow_controller: Arc<FlowController>,
     tls_acceptor: Option<TlsAcceptor>,
     mut shutdown_rx: watch::Receiver<bool>,
@@ -105,7 +109,7 @@ pub async fn run_server_with_shutdown(
                             continue;
                         }
 
-                        let router = router.clone();
+                        let handler = handler.clone();
                         let flow_controller = flow_controller.clone();
 
                         if let Some(ref acceptor) = tls_acceptor {
@@ -115,7 +119,7 @@ pub async fn run_server_with_shutdown(
                                 match acceptor.accept(stream).await {
                                     Ok(tls_stream) => {
                                         info!(peer = %peer, "TLS connection established");
-                                        handle_tls_connection(tls_stream, peer, router).await;
+                                        handle_tls_connection(tls_stream, peer, handler).await;
                                     }
                                     Err(e) => {
                                         warn!(peer = %peer, error = %e, "TLS handshake failed");
@@ -127,7 +131,7 @@ pub async fn run_server_with_shutdown(
                             // 纯 TCP 模式
                             info!(peer = %peer, "Accepted new connection");
                             tokio::spawn(async move {
-                                handle_connection(stream, router).await;
+                                handle_connection(stream, handler).await;
                                 flow_controller.on_connection_close();
                             });
                         }
