@@ -13,6 +13,8 @@ rk-protocol = { workspace = true }
 rk-network = { workspace = true }
 rk-storage = { workspace = true }
 rk-broker = { workspace = true }
+rk-controller = { workspace = true }
+rk-replication = { workspace = true }
 rk-security = { workspace = true }
 tokio = { workspace = true }
 tokio-rustls = "0.26"
@@ -29,6 +31,5 @@ crc32c = { workspace = true }
 rk-core = { workspace = true }
 rk-protocol = { workspace = true }
 rk-storage = { workspace = true }
-rk-controller = { workspace = true }
 rk-security = { workspace = true }
 rk-broker = { workspace = true }

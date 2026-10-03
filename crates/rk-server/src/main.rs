@@ -4,6 +4,7 @@
 //! 集成: PartitionManager + OffsetManager + PersistentOffsetManager
 //!        + BrokerRouter + TCP Server + HTTP Metrics Server + Graceful Shutdown
 //!        + ConfigReloader (SIGHUP) + Startup Banner
+//!        + KRaft RaftNode (集群模式) + ReplicaManager (副本同步)
 
 use clap::Parser;
 use std::collections::HashMap;
@@ -193,6 +194,77 @@ async fn main() -> anyhow::Result<()> {
     ));
     info!("Broker router initialized");
 
+    // ─── KRaft 节点初始化 (集群模式) ─────────────────────────────
+    //
+    // 判定集群模式: controller.quorum_peers 非空时认为是多节点集群，
+    // 否则以单节点模式运行，跳过 Raft 选举流程（避免单节点 Raft
+    // 对现有行为产生任何影响）。
+    let raft_node = if config.controller.quorum_peers.is_empty() {
+        info!("Running in single-node mode, KRaft consensus skipped");
+        None
+    } else {
+        let raft_address = format!("{}:{}", config.broker.host, config.broker.port);
+        let node = Arc::new(rk_controller::RaftNode::new(
+            config.broker.id as u64,
+            raft_address.clone(),
+            rk_controller::NodeRole::ControllerBroker,
+        ));
+
+        // 将配置文件中声明的 quorum peers 注册为集群成员
+        for (idx, peer) in config.controller.quorum_peers.iter().enumerate() {
+            // peer 格式: "host:port"，节点 ID 按序从 1 开始（本节点已在构造时加入）
+            let peer_id = (idx as u64) + 1;
+            if peer_id != config.broker.id as u64 {
+                node.add_member(rk_controller::LocalNode {
+                    node_id: peer_id,
+                    address: peer.clone(),
+                    role: rk_controller::NodeRole::ControllerBroker,
+                });
+            }
+        }
+
+        node.mark_started().await;
+
+        info!(
+            node_id = config.broker.id,
+            address = %raft_address,
+            peers = config.controller.quorum_peers.len(),
+            "KRaft node initialized (cluster mode)"
+        );
+        Some(node)
+    };
+
+    // ─── ReplicaManager 初始化 ────────────────────────────────────
+    //
+    // 无论单节点还是集群模式都初始化 ReplicaManager，用于跟踪
+    // ISR、HW/LEO 状态。单节点时所有 partition 均以本地 broker 为 Leader。
+    let replica_manager = Arc::new(rk_replication::ReplicaManager::with_defaults(
+        rk_core::types::BrokerId(config.broker.id),
+    ));
+    info!(
+        broker_id = config.broker.id,
+        "ReplicaManager initialized"
+    );
+
+    // 启动 ISR 定期检查任务 (每 5 秒输出副本状态摘要)
+    let replica_manager_clone = replica_manager.clone();
+    let isr_check_interval = config.replication.replica_lag_time_max_ms.max(5_000);
+    let isr_monitor_handle = tokio::spawn(async move {
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_millis(isr_check_interval));
+        loop {
+            interval.tick().await;
+            let summary = replica_manager_clone.summary();
+            tracing::debug!(
+                partitions = summary.partition_count,
+                leaders = summary.leader_count,
+                replicas = summary.total_replicas,
+                isr_members = summary.total_isr_members,
+                "ReplicaManager ISR monitor tick"
+            );
+        }
+    });
+
     // 创建优雅关闭信号通道
     let (shutdown_tx, shutdown_rx_tcp) = watch::channel(false);
     let shutdown_rx_http = shutdown_tx.subscribe();
@@ -333,6 +405,25 @@ async fn main() -> anyhow::Result<()> {
     // 停止 SIGHUP 处理任务和偏移量快照任务
     sighup_handle.abort();
     flush_handle.abort();
+
+    // 停止 ISR 监控任务
+    isr_monitor_handle.abort();
+
+    // 停止 KRaft 节点 (如果启用)
+    if let Some(ref node) = raft_node {
+        info!(node_id = node.node_id(), "KRaft node stopped");
+    }
+    drop(raft_node);
+
+    // 停止 ReplicaManager
+    {
+        let summary = replica_manager.summary();
+        info!(
+            partitions = summary.partition_count,
+            "ReplicaManager stopped"
+        );
+    }
+    drop(replica_manager);
 
     // 最后一次保存偏移量快照
     if let Err(e) = pom_for_flush.save_to_disk() {
