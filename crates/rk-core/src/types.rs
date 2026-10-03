@@ -88,7 +88,9 @@ pub enum ApiKey {
     InitProducerId = 22,
     OffsetForLeaderEpoch = 23,
     AddPartitionsToTxn = 24,
+    AddOffsetsToTxn = 25,
     EndTxn = 26,
+    TxnOffsetCommit = 27,
     DescribeConfigs = 32,
     AlterConfigs = 33,
     SaslAuthenticate = 36,
@@ -140,7 +142,9 @@ impl ApiKey {
             22 => Some(Self::InitProducerId),
             23 => Some(Self::OffsetForLeaderEpoch),
             24 => Some(Self::AddPartitionsToTxn),
+            25 => Some(Self::AddOffsetsToTxn),
             26 => Some(Self::EndTxn),
+            27 => Some(Self::TxnOffsetCommit),
             32 => Some(Self::DescribeConfigs),
             33 => Some(Self::AlterConfigs),
             36 => Some(Self::SaslAuthenticate),
@@ -207,8 +211,12 @@ impl ApiKey {
             ApiKey::OffsetForLeaderEpoch => version >= 3,
             // AddPartitionsToTxn v3+ is flexible
             ApiKey::AddPartitionsToTxn => version >= 3,
+            // AddOffsetsToTxn v3+ is flexible
+            ApiKey::AddOffsetsToTxn => version >= 3,
             // EndTxn v3+ is flexible
             ApiKey::EndTxn => version >= 3,
+            // TxnOffsetCommit v3+ is flexible
+            ApiKey::TxnOffsetCommit => version >= 3,
             // CreateTopics v3+ (actually not in Kafka, but for future)
             // DeleteTopics v4+ is flexible
             ApiKey::DeleteTopics => version >= 4,

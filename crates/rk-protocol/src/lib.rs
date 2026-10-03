@@ -20,7 +20,8 @@ pub use api_versions::{
     ApiVersion, ApiVersionsRequest, ApiVersionsResponse, SUPPORTED_API_VERSIONS,
 };
 pub use apis::{
-    AddPartitionsToTxnRequest, AddPartitionsToTxnRequestTopic,
+    AddOffsetsToTxnRequest, AddOffsetsToTxnResponse, AddPartitionsToTxnRequest,
+    AddPartitionsToTxnRequestTopic,
     AddPartitionsToTxnRequestTransaction, AddPartitionsToTxnResponse,
     AddPartitionsToTxnResponsePartition, AddPartitionsToTxnResponseTopic,
     AddPartitionsToTxnResponseTransaction, AlterConfigsRequest, AlterConfigsRequestConfig,
@@ -74,6 +75,8 @@ pub use apis::{
     ProduceRequestPartition, ProduceRequestTopic, ProduceResponse, ProduceResponsePartition,
     ProduceResponseTopic, SaslAuthenticateRequest, SaslAuthenticateResponse, SaslHandshakeRequest,
     SaslHandshakeResponse, SyncGroupRequest, SyncGroupRequestAssignment, SyncGroupResponse,
+    TxnOffsetCommitRequest, TxnOffsetCommitRequestPartition, TxnOffsetCommitRequestTopic,
+    TxnOffsetCommitResponse, TxnOffsetCommitResponsePartition, TxnOffsetCommitResponseTopic,
 };
 pub use codec::{KafkaRequestDecoder, KafkaResponseEncoder};
 pub use error_codes::KafkaErrorCode;

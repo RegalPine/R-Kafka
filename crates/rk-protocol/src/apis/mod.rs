@@ -19,6 +19,7 @@
 //! - DescribeTopics (70)
 //! - DescribeQuorum (56)
 
+pub mod add_offsets_to_txn;
 pub mod add_partitions_to_txn;
 pub mod alter_configs;
 pub mod alter_partition_reassignments;
@@ -61,9 +62,11 @@ pub mod sasl_authenticate;
 pub mod sasl_handshake;
 pub mod stop_replica;
 pub mod sync_group;
+pub mod txn_offset_commit;
 pub mod update_metadata;
 pub mod vote;
 
+pub use add_offsets_to_txn::*;
 pub use add_partitions_to_txn::*;
 pub use alter_configs::*;
 pub use alter_partition_reassignments::*;
@@ -106,5 +109,6 @@ pub use sasl_authenticate::*;
 pub use sasl_handshake::*;
 pub use stop_replica::*;
 pub use sync_group::*;
+pub use txn_offset_commit::*;
 pub use update_metadata::*;
 pub use vote::*;

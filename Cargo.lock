@@ -1089,6 +1089,7 @@ dependencies = [
  "dashmap",
  "flume",
  "rk-core",
+ "rk-observability",
  "rk-protocol",
  "rk-security",
  "rk-storage",
@@ -1228,6 +1229,7 @@ dependencies = [
  "rk-controller",
  "rk-core",
  "rk-network",
+ "rk-observability",
  "rk-protocol",
  "rk-replication",
  "rk-security",
@@ -1237,7 +1239,6 @@ dependencies = [
  "tokio-rustls",
  "toml",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

@@ -14,6 +14,7 @@
 //! 处理、Partition 管理、偏移量管理、消费者组管理、SASL 认证、
 //! 幂等生产者/事务管理、请求路由。
 
+pub mod add_offsets_to_txn_handler;
 pub mod add_partitions_to_txn_handler;
 pub mod alter_configs_handler;
 pub mod alter_partition_reassignments_handler;
@@ -69,10 +70,12 @@ pub mod sasl_handshake_handler;
 pub mod stop_replica_handler;
 pub mod sync_group_handler;
 pub mod transaction_coordinator;
+pub mod txn_offset_commit_handler;
 pub mod update_metadata_handler;
 pub mod vote_handler;
 
 // Re-exports
+pub use add_offsets_to_txn_handler::AddOffsetsToTxnHandler;
 pub use add_partitions_to_txn_handler::AddPartitionsToTxnHandler;
 pub use alter_configs_handler::AlterConfigsHandler;
 pub use alter_partition_reassignments_handler::AlterPartitionReassignmentsHandler;
@@ -133,5 +136,6 @@ pub use transaction_coordinator::{
     TransactionCoordinator, TransactionLog, TransactionMetadata, TxnCoordinatorState, TxnLogEntry,
     TxnLogEntryType,
 };
+pub use txn_offset_commit_handler::TxnOffsetCommitHandler;
 pub use update_metadata_handler::UpdateMetadataHandler;
 pub use vote_handler::VoteHandler;

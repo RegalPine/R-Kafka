@@ -91,13 +91,9 @@ fn format_bytes(bytes: u64) -> String {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    // 初始化 tracing 日志
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    // 初始化 tracing 日志（统一使用 rk-observability::TracingSetup）
+    // 支持 RUST_LOG 环境变量过滤、fmt/json/OTLP 层配置
+    let _tracing_guard = rk_observability::init_tracing();
 
     // 加载配置
     let mut config = rk_core::BrokerConfig::from_file(&cli.config)?;
