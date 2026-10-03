@@ -234,8 +234,14 @@ async fn handle_http_request<M: MetricsProvider>(
             send_response(&mut stream, 200, "OK", "application/json", &json).await?;
         }
         "/metrics/prometheus" => {
-            let snapshot = metrics.snapshot();
-            let prom = <MetricsSnapshot as PrometheusMetrics>::to_prometheus(&snapshot, broker_id);
+            // 优先使用 MetricsProvider::prometheus_encode()（来自 PrometheusMetrics，含 Histogram）
+            // 不支持时退回使用快照手工拼接
+            let prom = if let Some(encoded) = metrics.prometheus_encode() {
+                encoded
+            } else {
+                let snapshot = metrics.snapshot();
+                <MetricsSnapshot as PrometheusMetrics>::to_prometheus(&snapshot, broker_id)
+            };
             send_response(
                 &mut stream,
                 200,

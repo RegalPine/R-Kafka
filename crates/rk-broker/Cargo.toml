@@ -8,6 +8,7 @@ rk-core = { workspace = true }
 rk-protocol = { workspace = true }
 rk-storage = { workspace = true }
 rk-security = { workspace = true }
+rk-observability = { workspace = true }
 bytes = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

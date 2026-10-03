@@ -272,7 +272,8 @@ async fn main() -> anyhow::Result<()> {
     // 启动 HTTP 监控服务器 (如果启用)
     let flow_controller = Arc::new(rk_network::FlowController::new(&config));
     let http_handle = if config.observability.metrics_enabled {
-        let metrics = Arc::new(rk_broker::BrokerMetrics::new());
+        // 从 router 获取共享的 BrokerMetrics，确保 HTTP 端点与 router 使用同一套指标数据
+        let metrics = router.metrics();
         let http_server = rk_network::HttpMetricsServer::new(
             config.broker.host.clone(),
             config.observability.metrics_port,

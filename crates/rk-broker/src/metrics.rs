@@ -2,11 +2,19 @@
 //!
 //! Broker 运行时指标收集器。
 //! 使用 AtomicU64 实现无锁计数器，支持实时查询。
+//! 同时桥接 PrometheusMetrics，使 /metrics/prometheus 端点能导出真实数据。
 
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 
+use rk_observability::PrometheusMetrics;
+
 /// Broker 运行时指标收集器
+///
+/// AtomicU64 计数器用于快速无锁读写。
+/// 内嵌 `Arc<PrometheusMetrics>` 实现桥接：每次 record_* 调用同步更新
+/// Prometheus Counter/Gauge，使 HTTP `/metrics/prometheus` 端点能导出真实指标。
 pub struct BrokerMetrics {
     /// 启动时间
     start_time: Instant,
@@ -30,10 +38,12 @@ pub struct BrokerMetrics {
     active_connections: AtomicU64,
     /// 总连接数
     total_connections: AtomicU64,
+    /// Prometheus 指标桥接 (用于 /metrics/prometheus 端点导出)
+    prometheus: Arc<PrometheusMetrics>,
 }
 
 impl BrokerMetrics {
-    /// 创建新的指标收集器
+    /// 创建新的指标收集器（同时初始化内嵌的 PrometheusMetrics）
     pub fn new() -> Self {
         Self {
             start_time: Instant::now(),
@@ -47,12 +57,20 @@ impl BrokerMetrics {
             total_bytes_fetched: AtomicU64::new(0),
             active_connections: AtomicU64::new(0),
             total_connections: AtomicU64::new(0),
+            prometheus: Arc::new(PrometheusMetrics::new()),
         }
+    }
+
+    /// 获取内嵌的共享 PrometheusMetrics（用于 HTTP 端点导出）
+    pub fn prometheus(&self) -> Arc<PrometheusMetrics> {
+        self.prometheus.clone()
     }
 
     /// 记录一次请求
     pub fn record_request(&self, api_key: i16) {
         self.total_requests.fetch_add(1, Ordering::Relaxed);
+        // 同步更新 Prometheus 指标
+        self.prometheus.record_request(api_key);
         match api_key {
             0 => {
                 self.produce_requests.fetch_add(1, Ordering::Relaxed);
@@ -72,6 +90,8 @@ impl BrokerMetrics {
     /// 记录一次错误
     pub fn record_error(&self) {
         self.total_errors.fetch_add(1, Ordering::Relaxed);
+        // 同步更新 Prometheus 错误计数（api_key -1 表示通用错误）
+        self.prometheus.record_error(-1);
     }
 
     /// 记录 Produce 消息
@@ -80,23 +100,31 @@ impl BrokerMetrics {
             .fetch_add(message_count, Ordering::Relaxed);
         self.total_bytes_produced
             .fetch_add(byte_count, Ordering::Relaxed);
+        // 同步更新 Prometheus 指标
+        self.prometheus.record_produce(message_count, byte_count);
     }
 
     /// 记录 Fetch 字节数
     pub fn record_fetch(&self, byte_count: u64) {
         self.total_bytes_fetched
             .fetch_add(byte_count, Ordering::Relaxed);
+        // 同步更新 Prometheus 指标
+        self.prometheus.record_fetch(byte_count);
     }
 
     /// 记录新连接
     pub fn record_connection(&self) {
         self.active_connections.fetch_add(1, Ordering::Relaxed);
         self.total_connections.fetch_add(1, Ordering::Relaxed);
+        // 同步更新 Prometheus 活跃连接数
+        self.prometheus.active_connections.inc();
     }
 
     /// 记录连接断开
     pub fn record_disconnect(&self) {
         self.active_connections.fetch_sub(1, Ordering::Relaxed);
+        // 同步更新 Prometheus 活跃连接数
+        self.prometheus.active_connections.dec();
     }
 
     /// 获取指标快照
@@ -142,6 +170,13 @@ impl rk_core::MetricsProvider for BrokerMetrics {
             active_connections: s.active_connections,
             total_connections: s.total_connections,
         }
+    }
+
+    /// 使用内嵌的 PrometheusMetrics 输出完整的 Prometheus text format
+    ///
+    /// 比手工拼接的快照数据更丰富，包含 Counter/Gauge/Histogram 分位数。
+    fn prometheus_encode(&self) -> Option<String> {
+        Some(self.prometheus.encode())
     }
 }
 

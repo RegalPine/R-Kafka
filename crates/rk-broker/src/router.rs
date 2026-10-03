@@ -384,6 +384,11 @@ impl BrokerRouter {
         self.metrics.snapshot()
     }
 
+    /// 获取共享的 BrokerMetrics（供 HTTP 监控服务器使用）
+    pub fn metrics(&self) -> Arc<crate::metrics::BrokerMetrics> {
+        self.metrics.clone()
+    }
+
     /// 获取共享的 SASL 认证器
     pub fn authenticator(&self) -> &Arc<SaslAuthenticator> {
         &self.authenticator
