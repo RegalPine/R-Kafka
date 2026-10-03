@@ -529,7 +529,10 @@ impl TieredStorageManager {
         };
 
         debug!(topic, partition, base_offset, "Migration task submitted");
-        self.pending_migrations.lock().unwrap().push(task);
+        self.pending_migrations
+            .lock()
+            .map_err(|e| RkError::Storage(format!("pending_migrations lock poisoned: {}", e)))?
+            .push(task);
         Ok(())
     }
 
@@ -549,7 +552,9 @@ impl TieredStorageManager {
 
         // 更新 pending task 状态
         {
-            let mut pending = self.pending_migrations.lock().unwrap();
+            let mut pending = self.pending_migrations
+                .lock()
+                .map_err(|e| RkError::Storage(format!("pending_migrations lock poisoned: {}", e)))?;
             for task in pending.iter_mut() {
                 if task.topic == topic
                     && task.partition == partition
@@ -578,11 +583,16 @@ impl TieredStorageManager {
                     topic: topic.to_string(),
                     partition,
                 };
-                self.manifest.lock().unwrap().add_segment(meta);
+                self.manifest
+                    .lock()
+                    .map_err(|e| RkError::Storage(format!("manifest lock poisoned: {}", e)))?
+                    .add_segment(meta);
 
                 // 更新 pending task
                 {
-                    let mut pending = self.pending_migrations.lock().unwrap();
+                    let mut pending = self.pending_migrations
+                        .lock()
+                        .map_err(|e| RkError::Storage(format!("pending_migrations lock poisoned: {}", e)))?;
                     for task in pending.iter_mut() {
                         if task.topic == topic
                             && task.partition == partition
@@ -608,7 +618,9 @@ impl TieredStorageManager {
             Err(e) => {
                 // 更新 pending task 为失败
                 {
-                    let mut pending = self.pending_migrations.lock().unwrap();
+                    let mut pending = self.pending_migrations
+                        .lock()
+                        .map_err(|e| RkError::Storage(format!("pending_migrations lock poisoned: {}", e)))?;
                     for task in pending.iter_mut() {
                         if task.topic == topic
                             && task.partition == partition
@@ -639,7 +651,9 @@ impl TieredStorageManager {
         partition: u32,
         offset: u64,
     ) -> Result<Vec<u8>> {
-        let manifest = self.manifest.lock().unwrap();
+        let manifest = self.manifest
+            .lock()
+            .map_err(|e| RkError::Storage(format!("manifest lock poisoned: {}", e)))?;
         let seg_meta = manifest
             .find_segment(topic, partition, offset)
             .ok_or_else(|| {
@@ -662,7 +676,9 @@ impl TieredStorageManager {
         partition: u32,
         base_offset: u64,
     ) -> Result<()> {
-        let mut manifest = self.manifest.lock().unwrap();
+        let mut manifest = self.manifest
+            .lock()
+            .map_err(|e| RkError::Storage(format!("manifest lock poisoned: {}", e)))?;
         if let Some(meta) = manifest.remove_segment(topic, partition, base_offset) {
             self.storage.delete_segment(&meta.handle)?;
             info!(topic, partition, base_offset, "Remote segment deleted");
@@ -681,7 +697,9 @@ impl TieredStorageManager {
         F: Fn(&str, u32, u64) -> Option<(u64, i64, Vec<u8>)>,
     {
         let tasks: Vec<MigrationTask> = {
-            let pending = self.pending_migrations.lock().unwrap();
+            let pending = self.pending_migrations
+                .lock()
+                .map_err(|e| RkError::Storage(format!("pending_migrations lock poisoned: {}", e)))?;
             pending
                 .iter()
                 .filter(|t| t.state == MigrationState::Pending)
@@ -720,14 +738,14 @@ impl TieredStorageManager {
 
     /// 获取清单快照
     pub fn manifest_snapshot(&self) -> RemoteLogManifest {
-        self.manifest.lock().unwrap().clone()
+        self.manifest.lock().expect("manifest lock should not be poisoned").clone()
     }
 
     /// 获取 pending 迁移任务数
     pub fn pending_count(&self) -> usize {
         self.pending_migrations
             .lock()
-            .unwrap()
+            .expect("pending_migrations lock should not be poisoned")
             .iter()
             .filter(|t| t.state == MigrationState::Pending)
             .count()
@@ -750,7 +768,7 @@ impl TieredStorageManager {
 
     /// 管理器摘要
     pub fn summary(&self) -> TieredStorageSummary {
-        let manifest_summary = self.manifest.lock().unwrap().summary();
+        let manifest_summary = self.manifest.lock().expect("manifest lock should not be poisoned").summary();
         TieredStorageSummary {
             enabled: self.config.enabled,
             manifest: manifest_summary,

@@ -110,7 +110,7 @@ impl LogSegment {
             (i64::MIN, 0u32, 0u64)
         } else {
             let batch_count = batches.len() as u64;
-            let last_batch = batches.last().unwrap();
+            let last_batch = batches.last().expect("batches is non-empty, last() always returns Some");
             let mut reader = KafkaReader::new(&last_batch.1);
             match decode_batch_header(&mut reader) {
                 Ok(hdr) => {

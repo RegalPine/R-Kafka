@@ -321,7 +321,9 @@ impl TransactionCoordinator {
             existing.last_update_time_ms = current_time_ms();
 
             // 写入事务日志
-            let mut log = self.txn_log.lock().unwrap();
+            let mut log = self.txn_log
+                .lock()
+                .map_err(|e| RkError::Storage(format!("txn_log lock poisoned: {}", e)))?;
             log.append(TxnLogEntryType::TxnEpochBump {
                 transactional_id: transactional_id.to_string(),
                 new_epoch,
@@ -373,7 +375,9 @@ impl TransactionCoordinator {
         );
 
         // 写入事务日志
-        let mut log = self.txn_log.lock().unwrap();
+        let mut log = self.txn_log
+            .lock()
+            .map_err(|e| RkError::Storage(format!("txn_log lock poisoned: {}", e)))?;
         log.append(TxnLogEntryType::TxnRegister {
             transactional_id: transactional_id.to_string(),
             producer_id,
@@ -421,7 +425,9 @@ impl TransactionCoordinator {
                 entry.txn_start_time_ms = current_time_ms();
                 self.producer_state_manager.begin_transaction(producer_id)?;
 
-                let mut log = self.txn_log.lock().unwrap();
+                let mut log = self.txn_log
+                    .lock()
+                    .map_err(|e| RkError::Storage(format!("txn_log lock poisoned: {}", e)))?;
                 log.append(TxnLogEntryType::TxnStart {
                     transactional_id: transactional_id.to_string(),
                     producer_id,
@@ -444,7 +450,9 @@ impl TransactionCoordinator {
             if !entry.partitions.contains(&tp) {
                 entry.partitions.push(tp);
 
-                let mut log = self.txn_log.lock().unwrap();
+                let mut log = self.txn_log
+                    .lock()
+                    .map_err(|e| RkError::Storage(format!("txn_log lock poisoned: {}", e)))?;
                 log.append(TxnLogEntryType::TxnAddPartitions {
                     transactional_id: transactional_id.to_string(),
                     topic: topic.to_string(),
@@ -495,7 +503,9 @@ impl TransactionCoordinator {
 
         // 写入 commit 日志
         {
-            let mut log = self.txn_log.lock().unwrap();
+            let mut log = self.txn_log
+                .lock()
+                .map_err(|e| RkError::Storage(format!("txn_log lock poisoned: {}", e)))?;
             log.append(TxnLogEntryType::TxnCommit {
                 transactional_id: transactional_id.to_string(),
                 producer_id,
@@ -546,7 +556,9 @@ impl TransactionCoordinator {
 
         // 写入 abort 日志
         {
-            let mut log = self.txn_log.lock().unwrap();
+            let mut log = self.txn_log
+                .lock()
+                .map_err(|e| RkError::Storage(format!("txn_log lock poisoned: {}", e)))?;
             log.append(TxnLogEntryType::TxnAbort {
                 transactional_id: transactional_id.to_string(),
                 producer_id,
@@ -605,13 +617,13 @@ impl TransactionCoordinator {
 
     /// 获取事务日志引用 (用于测试/诊断)
     pub fn txn_log_entries(&self) -> Vec<TxnLogEntry> {
-        let log = self.txn_log.lock().unwrap();
+        let log = self.txn_log.lock().expect("txn_log lock should not be poisoned");
         log.entries().to_vec()
     }
 
     /// 获取事务日志条目数
     pub fn txn_log_len(&self) -> usize {
-        let log = self.txn_log.lock().unwrap();
+        let log = self.txn_log.lock().expect("txn_log lock should not be poisoned");
         log.len()
     }
 
